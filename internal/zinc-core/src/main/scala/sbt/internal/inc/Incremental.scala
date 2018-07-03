@@ -10,14 +10,17 @@ package internal
 package inc
 
 import java.io.File
+import java.nio.file.{ Files, StandardOpenOption }
 
-import sbt.util.{ Level, Logger }
+import sbt.io.IO
+import sbt.util.{ Logger, Level }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 import xsbti.compile.{
-  ClassFileManager => XClassFileManager,
-  CompileAnalysis,
+  Output,
   DependencyChanges,
-  IncOptions
+  IncOptions,
+  CompileAnalysis,
+  ClassFileManager => XClassFileManager
 }
 
 /**
@@ -56,6 +59,7 @@ object Incremental {
       previous0: CompileAnalysis,
       current: ReadStamps,
       compile: (Set[File], DependencyChanges, xsbti.AnalysisCallback, XClassFileManager) => Unit,
+      output: Output,
       callbackBuilder: AnalysisCallback.Builder,
       log: sbt.util.Logger,
       options: IncOptions
@@ -78,16 +82,20 @@ object Incremental {
           "All initially invalidated classes: " + initialInvClasses + "\n" +
             "All initially invalidated sources: " + initialInvSources + "\n")
     val analysis = manageClassfiles(options) { classfileManager =>
-      incremental.cycle(initialInvClasses,
-                        initialInvSources,
-                        sources,
-                        binaryChanges,
-                        lookup,
-                        previous,
-                        doCompile(compile, callbackBuilder, classfileManager),
-                        classfileManager,
-                        1)
+      incremental.cycle(
+        initialInvClasses,
+        initialInvSources,
+        sources,
+        binaryChanges,
+        lookup,
+        previous,
+        doCompile(compile, callbackBuilder, classfileManager),
+        output,
+        classfileManager,
+        1
+      )
     }
+
     (initialInvClasses.nonEmpty || initialInvSources.nonEmpty, analysis)
   }
 

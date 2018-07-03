@@ -168,8 +168,8 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
             val loader = ClasspathUtilities.makeLoader(classpath, i.si, directory)
             val main = p.getMainMethod(mainClassName, loader)
             p.invokeMain(loader, main, params)
-          case _ =>
-            throw new TestFailed("Found more than one main class.")
+          case s =>
+            throw new TestFailed(s"Found more than one main class: $s")
         }
     },
     noArgs("package") { case (p, i) => p.packageBin(i) },

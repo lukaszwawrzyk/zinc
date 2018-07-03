@@ -70,6 +70,7 @@ object IncrementalCompile {
         previous,
         current,
         compile,
+        output,
         new AnalysisCallback.Builder(internalBinaryToSourceClassName,
                                      internalSourceToClassNamesMap,
                                      externalAPI,

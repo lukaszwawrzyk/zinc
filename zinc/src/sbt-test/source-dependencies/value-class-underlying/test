@@ -1,3 +1,6 @@
-> run
-$ copy-file changes/A2.scala A.scala
-> run
+> compile
+$ pause
+$ copy-file changes/B.scala B.scala
+$ copy-file changes/Main.scala Main.scala
+> compile
+$ pause

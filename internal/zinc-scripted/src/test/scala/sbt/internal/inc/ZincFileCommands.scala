@@ -9,7 +9,7 @@ class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) 
     super.commandMap + {
       "pause" noArg {
         // Redefine pause not to use `System.console`, which is too restrictive
-        println(s"Pausing in $baseDirectory. Press enter to continue.")
+        println(s"Pausing in $baseDirectory Press enter to continue.")
         scala.io.StdIn.readLine()
         println("Restarting the execution.")
       }

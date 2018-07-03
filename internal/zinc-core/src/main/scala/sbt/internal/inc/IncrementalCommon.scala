@@ -10,14 +10,17 @@ package internal
 package inc
 
 import java.io.File
+import java.nio.file.{ Files, StandardOpenOption }
 
+import sbt.io.IO
 import xsbti.api.AnalyzedClass
 import xsbti.compile.{
-  Changes,
-  ClassFileManager => XClassFileManager,
-  CompileAnalysis,
   DependencyChanges,
-  IncOptions
+  CompileAnalysis,
+  Changes,
+  Output,
+  IncOptions,
+  ClassFileManager => XClassFileManager
 }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 
@@ -42,6 +45,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                            lookup: ExternalLookup,
                            previous: Analysis,
                            doCompile: (Set[File], DependencyChanges) => Analysis,
+                           output: Output,
                            classfileManager: XClassFileManager,
                            cycleNum: Int): Analysis =
     if (invalidatedRaw.isEmpty && modifiedSrcs.isEmpty)
@@ -55,6 +59,10 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
       val withPackageObjects = invalidatedRaw ++ invalidatedPackageObjects
       val invalidatedClasses = withPackageObjects
 
+      val outputJar = output.getSingleOutput.get
+      val prevJar = new File(outputJar.toString.dropRight(4) + "~.jar")
+      if (outputJar.exists()) IO.move(outputJar, prevJar)
+
       val (current, recompiledRecently) = recompileClasses(invalidatedClasses,
                                                            modifiedSrcs,
                                                            allSources,
@@ -62,6 +70,11 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                                                            previous,
                                                            doCompile,
                                                            classfileManager)
+
+      if (prevJar.exists()) {
+        mergeJars(into = prevJar, from = outputJar)
+        IO.move(prevJar, outputJar)
+      }
 
       // If we recompiled all sources no need to check what is changed since there is nothing more to recompile
       if (recompiledRecently == allSources) current
@@ -97,10 +110,32 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
               lookup,
               current,
               doCompile,
+              output,
               classfileManager,
               cycleNum + 1)
       }
     }
+
+  private def mergeJars(into: File, from: File) = {
+    val parent = into.toPath.getParent
+    val intoTmpDir = parent.resolve("intotmp")
+    val fromTmpDir = parent.resolve("fromtmp")
+    val script =
+      s"""mkdir $intoTmpDir
+         |mkdir $fromTmpDir
+         |(cd $intoTmpDir; unzip $into)
+         |(cd $fromTmpDir; unzip $from)
+         |rsync -a $fromTmpDir/ $intoTmpDir/
+         |rm -rf $into
+         |jar -cvf $into -C $intoTmpDir .
+         |rm -rf $intoTmpDir $fromTmpDir
+      """.stripMargin
+    val scriptFile = parent.resolve("script.sh")
+    Files.write(scriptFile, script.getBytes, StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+    import scala.sys.process._
+    s"bash $scriptFile".!
+    Files.deleteIfExists(scriptFile)
+  }
 
   private[this] def recompileClasses(classes: Set[String],
                                      modifiedSrcs: Set[File],
