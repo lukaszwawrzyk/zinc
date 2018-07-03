@@ -7,6 +7,9 @@
 
 package xsbt
 
+import java.io.File
+import java.net.URI
+
 import scala.tools.nsc.Phase
 
 object Analyzer {
@@ -27,26 +30,28 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         for (iclass <- unit.icode) {
           val sym = iclass.symbol
           def addGenerated(separatorRequired: Boolean): Unit = {
-            for (classFile <- outputDirs map (fileForClass(_, sym, separatorRequired)) find (_.exists)) {
-              assert(sym.isClass, s"${sym.fullName} is not a class")
-              // we would like to use Symbol.isLocalClass but that relies on Symbol.owner which
-              // is lost at this point due to lambdalift
-              // the LocalNonLocalClass.isLocal can return None, which means, we're asking about
-              // the class it has not seen before. How's that possible given we're performing a lookup
-              // for every declared class in Dependency phase? We can have new classes introduced after
-              // Dependency phase has ran. For example, the implementation classes for traits.
-              val isLocalClass = localToNonLocalClass.isLocal(sym).getOrElse(true)
-              if (!isLocalClass) {
-                val srcClassName = classNameAsString(sym)
-                val binaryClassName = flatclassName(sym, '.', separatorRequired)
-                callback.generatedNonLocalClass(sourceFile,
-                                                classFile,
-                                                binaryClassName,
-                                                srcClassName)
-              } else {
-                callback.generatedLocalClass(sourceFile, classFile)
+            locatePlainClassFile(sym, separatorRequired)
+              .orElse(locateClassInJar(sym, separatorRequired))
+              .foreach { classFile =>
+                assert(sym.isClass, s"${sym.fullName} is not a class")
+                // we would like to use Symbol.isLocalClass but that relies on Symbol.owner which
+                // is lost at this point due to lambdalift
+                // the LocalNonLocalClass.isLocal can return None, which means, we're asking about
+                // the class it has not seen before. How's that possible given we're performing a lookup
+                // for every declared class in Dependency phase? We can have new classes introduced after
+                // Dependency phase has ran. For example, the implementation classes for traits.
+                val isLocalClass = localToNonLocalClass.isLocal(sym).getOrElse(true)
+                if (!isLocalClass) {
+                  val srcClassName = classNameAsString(sym)
+                  val binaryClassName = flatclassName(sym, '.', separatorRequired)
+                  callback.generatedNonLocalClass(sourceFile,
+                                                  classFile,
+                                                  binaryClassName,
+                                                  srcClassName)
+                } else {
+                  callback.generatedLocalClass(sourceFile, classFile)
+                }
               }
-            }
           }
           if (sym.isModuleClass && !sym.isImplClass) {
             if (isTopLevelModule(sym) && sym.companionClass == NoSymbol)
@@ -58,4 +63,23 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       }
     }
   }
+
+  private def locatePlainClassFile(sym: Symbol, separatorRequired: Boolean) = {
+    outputDirs
+      .map(fileForClass(_, sym, separatorRequired))
+      .find(_.exists)
+  }
+
+  private def locateClassInJar(sym: Symbol, separatorRequired: Boolean) = {
+    outputDirs.flatMap { jarFile =>
+      val relativeFile =
+        fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2)
+      val uri = "jar:file:" + jarFile.toString + "!/" + relativeFile
+      val file = new File(uri)
+      if (new URI(uri).toURL.openConnection().getContentLength != -1) {
+        Some(file)
+      } else None
+    }.headOption
+  }
+
 }
