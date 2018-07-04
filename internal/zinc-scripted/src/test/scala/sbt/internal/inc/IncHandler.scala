@@ -2,37 +2,42 @@ package sbt
 package internal
 package inc
 
-import java.io.{ File, FileInputStream }
+import java.io.{ FileInputStream, File }
 import java.net.URLClassLoader
 import java.util.jar.Manifest
 
 import sbt.util.Logger
 import sbt.util.InterfaceUtil._
-import sbt.internal.inc.JavaInterfaceUtil.{ EnrichOption, EnrichOptional }
+import sbt.internal.inc.JavaInterfaceUtil.{ EnrichOptional, EnrichOption }
 import xsbt.api.Discovery
-import xsbti.{ Problem, Severity }
+import xsbti.{ Problem, Severity, Reporter }
 import xsbti.compile.{
   AnalysisContents,
-  ClasspathOptionsUtil,
-  CompileAnalysis,
-  CompileOrder,
-  CompilerCache,
-  DefinesClass,
-  IncOptions,
   IncOptionsUtil,
+  CompileAnalysis,
+  IncToolOptions,
   PerClasspathEntryLookup,
+  JavaCompiler,
   PreviousResult,
+  ClasspathOptionsUtil,
+  DefinesClass,
+  Javadoc,
+  CompileOrder,
+  JavaTools,
+  IncOptions,
+  CompilerCache,
   Compilers => XCompilers
 }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.io.DirectoryFilter
 import java.lang.reflect.Method
-import java.lang.reflect.Modifier.{ isPublic, isStatic }
-import java.util.{ Optional, Properties }
+import java.lang.reflect.Modifier.{ isStatic, isPublic }
+import java.util.{ Properties, Optional }
 
 import sbt.internal.inc.classpath.{ ClassLoaderCache, ClasspathUtilities }
-import sbt.internal.scripted.{ StatementHandler, TestFailed }
+import sbt.internal.inc.javac.JavaTools
+import sbt.internal.scripted.{ TestFailed, StatementHandler }
 import sbt.internal.util.ManagedLogger
 import sjsonnew.support.scalajson.unsafe.{ Converter, Parser => JsonParser }
 
@@ -164,7 +169,9 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
         val analysis = p.compile(i)
         p.discoverMainClasses(Some(analysis.apis)) match {
           case Seq(mainClassName) =>
-            val classpath: Array[File] = (i.si.allJars :+ p.classesDir) map { _.getAbsoluteFile }
+            val classpath: Array[File] = (i.si.allJars :+ p.classesDir :+ p.outputJar) map {
+              _.getAbsoluteFile
+            }
             val loader = ClasspathUtilities.makeLoader(classpath, i.si, directory)
             val main = p.getMainMethod(mainClassName, loader)
             p.invokeMain(loader, main, params)
@@ -226,6 +233,7 @@ case class ProjectStructure(
   }
   val targetDir = baseDirectory / "target"
   val classesDir = targetDir / "classes"
+  val outputJar = classesDir / "output.jar"
   val generatedClassFiles = classesDir ** "*.class"
   val scalaSourceDirectory = baseDirectory / "src" / "main" / "scala"
   val javaSourceDirectory = baseDirectory / "src" / "main" / "java"
@@ -326,7 +334,13 @@ case class ProjectStructure(
     def relativeClassDir(f: File): File = f.relativeTo(classesDir) getOrElse f
     def products(srcFile: String): Set[String] = {
       val productFiles = analysis.relations.products(baseDirectory / srcFile)
-      productFiles.map(relativeClassDir).map(_.getPath)
+      productFiles.map { file =>
+        if (file.getPath.startsWith("jar:file")) {
+          file.getPath.split("!/")(1)
+        } else {
+          relativeClassDir(file).getPath
+        }
+      }
     }
     def assertClasses(expected: Set[String], actual: Set[String]) =
       assert(expected == actual, s"Expected $expected products, got $actual")
@@ -378,11 +392,12 @@ case class ProjectStructure(
                                optionProgress = None,
                                extra)
 
+    val tmpOutputJar = file(outputJar.toString.replace(".jar", "~.jar"))
     val classpath =
-      (i.si.allJars.toList ++ (unmanagedJars :+ classesDir) ++ internalClasspath).toArray
+      (i.si.allJars.toList ++ (unmanagedJars :+ classesDir :+ outputJar :+ tmpOutputJar) ++ internalClasspath).toArray
     val in = compiler.inputs(classpath,
                              sources.toArray,
-                             classesDir,
+                             outputJar,
                              scalacOptions,
                              Array(),
                              maxErrors,

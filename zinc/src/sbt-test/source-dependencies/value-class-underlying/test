@@ -1,6 +1,6 @@
 > compile
-$ pause
+# $ pause
 $ copy-file changes/B.scala B.scala
 $ copy-file changes/Main.scala Main.scala
 > compile
-$ pause
+# $ pause

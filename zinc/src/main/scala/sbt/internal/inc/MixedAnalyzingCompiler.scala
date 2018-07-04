@@ -58,6 +58,9 @@ final class MixedAnalyzingCompiler(
     outputDirs.foreach { d =>
       if (!d.getPath.endsWith(".jar"))
         IO.createDirectory(d)
+      else {
+        IO.createDirectory(d.getParentFile)
+      }
     }
 
     val incSrc = sources.filter(include)
@@ -94,10 +97,16 @@ final class MixedAnalyzingCompiler(
               incOptions.useCustomizedFileManager()
             )
           val joptions = options.javacOptions().toArray[String]
+          val outputDir = output match {
+            case s: SingleOutput =>
+              val out = s.getSingleOutput.get.getParent
+              CompileOutput(new File(out))
+            case a => a
+          }
           javac.compile(
             javaSrcs,
             joptions,
-            output,
+            outputDir,
             callback,
             incToolOptions,
             reporter,

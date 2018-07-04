@@ -48,16 +48,12 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
     val javacChosen = compilers.javaTools.javac
     val scalac = compilers.scalac
     val extraOptions = extra.toList.map(_.toScalaTuple)
-    val outputJar = new File(classesDirectory.toString + ".jar")
-    val tmpOutputJar = new File(classesDirectory.toString + "~.jar")
-    val newCp = scala.collection.mutable.WrappedArray.make(classpath) ++ Array(outputJar,
-                                                                               tmpOutputJar)
     compileIncrementally(
       scalac,
       javacChosen,
       sources,
-      newCp,
-      CompileOutput(outputJar),
+      classpath,
+      CompileOutput(classesDirectory),
       cache,
       progress().toOption,
       scalacOptions,
