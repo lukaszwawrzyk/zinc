@@ -47,27 +47,13 @@ object ClassFileManager {
   private final class DeleteClassFileManager extends XClassFileManager {
 
     override def delete(classes: Array[File]): Unit = {
-      val (jared, regular) = classes.partition(_.toString.startsWith("jar:file:"))
+      val (jared, regular) = splitToClassesAndJars(classes)
       IO.deleteFilesEmptyDirs(regular)
-      jared
-        .map(_.toString.split("!"))
-        .collect { case Array(jar, classFile) => (jar, classFile) }
-        .groupBy(_._1)
-        .mapValues(_.map(_._2))
-        .foreach {
-          case (jar, classes) =>
-            removeFromZip(URI.create(jar), classes)
-        }
-
-    }
-
-    private def removeFromZip(zip: URI, classes: Array[String]): Unit = {
-      val env = new java.util.HashMap[String, String]
-      val fs = FileSystems.newFileSystem(zip, env)
-      classes.foreach { cls =>
-        Files.delete(fs.getPath(cls))
+      groupByJars(jared).foreach {
+        case (jar, classes) =>
+          removeFromZip(URI.create(jar), classes)
       }
-      fs.close()
+
     }
 
     override def generated(classes: Array[File]): Unit = ()
@@ -106,13 +92,25 @@ object ClassFileManager {
 
     override def delete(classes: Array[File]): Unit = {
       logger.debug(s"About to delete class files:\n${showFiles(classes)}")
+      val (jared, regular) = splitToClassesAndJars(classes)
+
       val toBeBackedUp =
-        classes.filter(c => c.exists && !movedClasses.contains(c) && !generatedClasses(c))
+        regular.filter(c => c.exists && !movedClasses.contains(c) && !generatedClasses(c))
       logger.debug(s"We backup class files:\n${showFiles(toBeBackedUp)}")
       for (c <- toBeBackedUp) {
         movedClasses.put(c, move(c))
       }
-      IO.deleteFilesEmptyDirs(classes)
+      IO.deleteFilesEmptyDirs(regular)
+
+      val jars = getJars(jared)
+      jars.foreach { jar =>
+        movedClasses.put(jar, copy(jar))
+      }
+      groupByJars(jared).foreach {
+        case (jar, classes) =>
+          removeFromZip(URI.create(jar), classes)
+      }
+
     }
 
     override def generated(classes: Array[File]): Unit = {
@@ -127,6 +125,7 @@ object ClassFileManager {
         logger.debug(s"Removing generated classes:\n${showFiles(generatedClasses)}")
         IO.deleteFilesEmptyDirs(generatedClasses)
         logger.debug(s"Restoring class files: \n${showFiles(movedClasses.keys)}")
+        IO.deleteFilesEmptyDirs(getJars(generatedClasses.toArray))
         for ((orig, tmp) <- movedClasses) IO.move(tmp, orig)
       }
       logger.debug(s"Removing the temporary directory used for backing up class files: $tempDir")
@@ -138,5 +137,41 @@ object ClassFileManager {
       IO.move(c, target)
       target
     }
+
+    def copy(c: File): File = {
+      val target = File.createTempFile("sbt", ".jar", tempDir)
+      IO.copy(Seq(c -> target))
+      target
+    }
+
   }
+
+  private def removeFromZip(zip: URI, classes: Array[String]): Unit = {
+    val env = new java.util.HashMap[String, String]
+    val fs = FileSystems.newFileSystem(zip, env)
+    classes.foreach { cls =>
+      Files.delete(fs.getPath(cls))
+    }
+    fs.close()
+  }
+
+  private def groupByJars(jared: Array[File]) = {
+    jared
+      .map(_.toString.split("!"))
+      .collect { case Array(jar, classFile) => (jar, classFile) }
+      .groupBy(_._1)
+      .mapValues(_.map(_._2))
+  }
+
+  private def getJars(jared: Array[File]) = {
+    jared
+      .map(_.toString.split("!"))
+      .collect { case Array(jar, classFile) => new File(jar.stripPrefix("jar:file")) }
+      .distinct
+  }
+
+  private def splitToClassesAndJars(classes: Array[File]) = {
+    classes.partition(_.toString.startsWith("jar:file:"))
+  }
+
 }

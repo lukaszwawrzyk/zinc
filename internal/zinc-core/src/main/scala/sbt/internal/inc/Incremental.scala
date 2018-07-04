@@ -132,10 +132,8 @@ object Incremental {
   private[sbt] def prune(invalidatedSrcs: Set[File],
                          previous0: CompileAnalysis,
                          classfileManager: XClassFileManager): Analysis = {
-    scala.io.StdIn.readLine("Before prune")
     val previous = previous0 match { case a: Analysis => a }
     classfileManager.delete(invalidatedSrcs.flatMap(previous.relations.products).toArray)
-    scala.io.StdIn.readLine("After prune")
     previous -- invalidatedSrcs
   }
 
