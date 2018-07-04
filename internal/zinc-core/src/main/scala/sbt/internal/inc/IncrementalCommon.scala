@@ -59,22 +59,14 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
       val withPackageObjects = invalidatedRaw ++ invalidatedPackageObjects
       val invalidatedClasses = withPackageObjects
 
-      val outputJar = output.getSingleOutput.get
-      val prevJar = new File(outputJar.toString.dropRight(4) + "~.jar")
-      if (outputJar.exists()) IO.move(outputJar, prevJar)
-
       val (current, recompiledRecently) = recompileClasses(invalidatedClasses,
                                                            modifiedSrcs,
                                                            allSources,
                                                            binaryChanges,
                                                            previous,
                                                            doCompile,
+                                                           output,
                                                            classfileManager)
-
-      if (prevJar.exists()) {
-        mergeJars(into = prevJar, from = outputJar)
-        IO.move(prevJar, outputJar)
-      }
 
       // If we recompiled all sources no need to check what is changed since there is nothing more to recompile
       if (recompiledRecently == allSources) current
@@ -116,6 +108,47 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
       }
     }
 
+  private[this] def recompileClasses(classes: Set[String],
+                                     modifiedSrcs: Set[File],
+                                     allSources: Set[File],
+                                     binaryChanges: DependencyChanges,
+                                     previous: Analysis,
+                                     doCompile: (Set[File], DependencyChanges) => Analysis,
+                                     output: Output,
+                                     classfileManager: XClassFileManager): (Analysis, Set[File]) = {
+    val invalidatedSources = classes.flatMap(previous.relations.definesClass) ++ modifiedSrcs
+    val invalidatedSourcesForCompilation = expand(invalidatedSources, allSources)
+    val pruned = Incremental.prune(invalidatedSourcesForCompilation, previous, classfileManager)
+    debugInnerSection("Pruned")(pruned.relations)
+
+    val fresh = withPreviousJar(output) {
+      doCompile(invalidatedSourcesForCompilation, binaryChanges)
+    }
+
+    // For javac as class files are added to classfileManager as they are generated, so
+    // this step is redundant. For scalac this is still necessary. TODO: do the same for scalac.
+    classfileManager.generated(fresh.relations.allProducts.toArray)
+    debugInnerSection("Fresh")(fresh.relations)
+    val merged = pruned ++ fresh //.copy(relations = pruned.relations ++ fresh.relations, apis = pruned.apis ++ fresh.apis)
+    debugInnerSection("Merged")(merged.relations)
+    (merged, invalidatedSourcesForCompilation)
+  }
+
+  private def withPreviousJar[A](output: Output)(action: => A): A = {
+    val outputJar = output.getSingleOutput.get
+    val prevJar = new File(outputJar.toString.dropRight(4) + "~.jar")
+    if (outputJar.exists()) IO.move(outputJar, prevJar)
+
+    val res = action
+
+    if (prevJar.exists()) {
+      mergeJars(into = prevJar, from = outputJar)
+      IO.move(prevJar, outputJar)
+    }
+
+    res
+  }
+
   private def mergeJars(into: File, from: File) = {
     val parent = into.toPath.getParent
     val intoTmpDir = parent.resolve("intotmp")
@@ -135,28 +168,6 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     import scala.sys.process._
     s"bash $scriptFile".!
     Files.deleteIfExists(scriptFile)
-  }
-
-  private[this] def recompileClasses(classes: Set[String],
-                                     modifiedSrcs: Set[File],
-                                     allSources: Set[File],
-                                     binaryChanges: DependencyChanges,
-                                     previous: Analysis,
-                                     doCompile: (Set[File], DependencyChanges) => Analysis,
-                                     classfileManager: XClassFileManager): (Analysis, Set[File]) = {
-    val invalidatedSources = classes.flatMap(previous.relations.definesClass) ++ modifiedSrcs
-    val invalidatedSourcesForCompilation = expand(invalidatedSources, allSources)
-    val pruned = Incremental.prune(invalidatedSourcesForCompilation, previous, classfileManager)
-    debugInnerSection("Pruned")(pruned.relations)
-
-    val fresh = doCompile(invalidatedSourcesForCompilation, binaryChanges)
-    // For javac as class files are added to classfileManager as they are generated, so
-    // this step is redundant. For scalac this is still necessary. TODO: do the same for scalac.
-    classfileManager.generated(fresh.relations.allProducts.toArray)
-    debugInnerSection("Fresh")(fresh.relations)
-    val merged = pruned ++ fresh //.copy(relations = pruned.relations ++ fresh.relations, apis = pruned.apis ++ fresh.apis)
-    debugInnerSection("Merged")(merged.relations)
-    (merged, invalidatedSourcesForCompilation)
   }
 
   private[this] def emptyChanges: DependencyChanges = new DependencyChanges {
