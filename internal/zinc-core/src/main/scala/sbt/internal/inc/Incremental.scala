@@ -134,6 +134,7 @@ object Incremental {
                          classfileManager: XClassFileManager): Analysis = {
     val previous = previous0 match { case a: Analysis => a }
     classfileManager.delete(invalidatedSrcs.flatMap(previous.relations.products).toArray)
+    scala.io.StdIn.readLine("After prune")
     previous -- invalidatedSrcs
   }
 
