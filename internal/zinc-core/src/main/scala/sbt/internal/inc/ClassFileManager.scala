@@ -11,15 +11,17 @@ package inc
 
 import sbt.io.IO
 import java.io.File
+import java.net.URI
+import java.nio.file.{ FileSystems, FileSystem, Files }
 import java.util.Optional
 
 import collection.mutable
 import xsbti.compile.{
-  ClassFileManager => XClassFileManager,
-  ClassFileManagerType,
-  DeleteImmediatelyManagerType,
   IncOptions,
-  TransactionalManagerType
+  DeleteImmediatelyManagerType,
+  TransactionalManagerType,
+  ClassFileManagerType,
+  ClassFileManager => XClassFileManager
 }
 
 object ClassFileManager {
@@ -43,8 +45,31 @@ object ClassFileManager {
   }
 
   private final class DeleteClassFileManager extends XClassFileManager {
-    override def delete(classes: Array[File]): Unit =
-      IO.deleteFilesEmptyDirs(classes)
+
+    override def delete(classes: Array[File]): Unit = {
+      val (jared, regular) = classes.partition(_.toString.startsWith("jar:file:"))
+      IO.deleteFilesEmptyDirs(regular)
+      jared
+        .map(_.toString.split("!"))
+        .collect { case Array(jar, classFile) => (jar, classFile) }
+        .groupBy(_._1)
+        .mapValues(_.map(_._2))
+        .foreach {
+          case (jar, classes) =>
+            removeFromZip(URI.create(jar), classes)
+        }
+
+    }
+
+    private def removeFromZip(zip: URI, classes: Array[String]): Unit = {
+      val env = new java.util.HashMap[String, String]
+      val fs = FileSystems.newFileSystem(zip, env)
+      classes.foreach { cls =>
+        Files.delete(fs.getPath(cls))
+      }
+      fs.close()
+    }
+
     override def generated(classes: Array[File]): Unit = ()
     override def complete(success: Boolean): Unit = ()
   }
