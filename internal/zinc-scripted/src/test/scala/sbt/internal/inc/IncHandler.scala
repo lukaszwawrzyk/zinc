@@ -415,17 +415,9 @@ case class ProjectStructure(
 
   def packageBin(i: IncInstance): Unit = {
     compile(i)
-    val jar = targetDir / s"$name.jar"
-    val manifest = new Manifest
-    val sources =
-      (classesDir ** -DirectoryFilter).get flatMap {
-        case x =>
-          IO.relativize(classesDir, x) match {
-            case Some(path) => List((x, path))
-            case _          => Nil
-          }
-      }
-    IO.jar(sources, jar, manifest)
+    val currentJar = outputJar
+    val targetJar = targetDir / s"$name.jar"
+    IO.copy(Seq(currentJar -> targetJar))
   }
 
   def unrecognizedArguments(commandName: String, args: List[String]): Unit =
