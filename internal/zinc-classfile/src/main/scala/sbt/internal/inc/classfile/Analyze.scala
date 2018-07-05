@@ -11,13 +11,14 @@ package inc
 package classfile
 
 import scala.collection.mutable
-import mutable.{ ArrayBuffer, Buffer }
+import mutable.{ Buffer, ArrayBuffer }
 import scala.annotation.tailrec
 import java.io.File
 import java.net.URL
+
 import xsbti.api.DependencyContext
 import xsbti.api.DependencyContext._
-import sbt.io.IO
+import sbt.io.IO.{ FileScheme, toFile }
 import sbt.util.Logger
 
 private[sbt] object Analyze {
@@ -169,12 +170,23 @@ private[sbt] object Analyze {
     }
   }
   private[this] def urlAsFile(url: URL, log: Logger): Option[File] =
-    try IO.urlAsFile(url)
-    catch {
+    try {
+      urlAsFile0(url)
+    } catch {
       case e: Exception =>
         log.warn("Could not convert URL '" + url.toExternalForm + "' to File: " + e.toString)
         None
     }
+
+  // copied and edited from IO
+  private def urlAsFile0(url: URL): Option[File] =
+    url.getProtocol match {
+      case FileScheme => Some(toFile(url))
+      case "jar" =>
+        Some(new File(url.toString))
+      case _ => None
+    }
+
   private def trapAndLog(log: Logger)(execute: => Unit): Unit = {
     try { execute } catch { case e: Throwable => log.trace(e); log.error(e.toString) }
   }

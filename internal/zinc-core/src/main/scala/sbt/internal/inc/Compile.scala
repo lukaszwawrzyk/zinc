@@ -10,23 +10,27 @@ package internal
 package inc
 
 import sbt.internal.inc.Analysis.{ LocalProduct, NonLocalProduct }
-import xsbt.api.{ APIUtil, HashAPI, NameHashing }
+import xsbt.api.{ APIUtil, NameHashing, HashAPI }
 import xsbti.api._
 import xsbti.compile.{
-  ClassFileManager => XClassFileManager,
-  CompileAnalysis,
+  Output,
   DependencyChanges,
   IncOptions,
-  Output
+  CompileAnalysis,
+  ClassFileManager => XClassFileManager
 }
-import xsbti.{ Position, Problem, Severity, UseScope }
+import xsbti.{ Position, UseScope, Problem, Severity }
 import sbt.util.Logger
 import sbt.util.InterfaceUtil.jo2o
 import java.io.File
+import java.net.URL
 import java.util
 
+import sbt.io.IO
 import xsbti.api.DependencyContext
 import xsbti.compile.analysis.ReadStamps
+
+import scala.util.Try
 
 /**
  * Helper methods for running incremental compilation.  All this is responsible for is
@@ -225,7 +229,15 @@ private final class AnalysisCallback(
             //  but not in the same compiler run (as in javac v. scalac)
             classDependency(dependsOn, fromClassName, context)
           case None =>
-            externalDependency(classFile, onBinaryClassName, fromClassName, fromSourceFile, context)
+            val cleanClassFile =
+              if (!classFile.exists())
+                Try(IO.urlAsFile(new URL(classFile.toString))).toOption.flatten.getOrElse(classFile)
+              else classFile
+            externalDependency(cleanClassFile,
+                               onBinaryClassName,
+                               fromClassName,
+                               fromSourceFile,
+                               context)
         }
     }
 
