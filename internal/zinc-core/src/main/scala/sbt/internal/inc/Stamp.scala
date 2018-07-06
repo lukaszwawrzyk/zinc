@@ -161,11 +161,9 @@ object Stamper {
   private def readModifiedTimeFromZip(uri: String): Long = {
     try {
       val Array(zip, file) = uri.split("!")
-      val env = new java.util.HashMap[String, String]
-      val fs = FileSystems.newFileSystem(URI.create(zip), env)
-      val time = Files.getLastModifiedTime(fs.getPath(file)).toMillis
-      fs.close()
-      time
+      STJUtil.withZipFs(URI.create(zip)) { fs =>
+        Files.getLastModifiedTime(fs.getPath(file)).toMillis
+      }
     } catch {
       case _: FileSystemNotFoundException => 0
     }
