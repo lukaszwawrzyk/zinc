@@ -10,10 +10,12 @@ package internal
 package inc
 
 import java.io.{ File, IOException }
+import java.net.URI
+import java.nio.file.{ FileSystemNotFoundException, FileSystems, Files }
 import java.util
 import java.util.Optional
 
-import sbt.io.{ Hash => IOHash, IO }
+import sbt.io.{ IO, Hash => IOHash }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 
 import scala.collection.immutable.TreeMap
@@ -142,8 +144,33 @@ object Stamper {
   }
 
   val forHash = (toStamp: File) => tryStamp(Hash.ofFile(toStamp))
-  val forLastModified = (toStamp: File) =>
-    tryStamp(new LastModified(IO.getModifiedTimeOrZero(toStamp)))
+  val forLastModified = { toStamp: File =>
+    tryStamp(new LastModified(getModifiedTimeOrZero(toStamp)))
+  }
+
+  private def getModifiedTimeOrZero(file: File): Long = {
+    if (file.exists()) {
+      IO.getModifiedTimeOrZero(file)
+    } else if (file.getPath.startsWith("jar:file")) {
+      readModifiedTimeFromZip(file.getPath)
+    } else {
+      0
+    }
+  }
+
+  private def readModifiedTimeFromZip(uri: String): Long = {
+    try {
+      val Array(zip, file) = uri.split("!")
+      val env = new java.util.HashMap[String, String]
+      val fs = FileSystems.newFileSystem(URI.create(zip), env)
+      val time = Files.getLastModifiedTime(fs.getPath(file)).toMillis
+      fs.close()
+      time
+    } catch {
+      case _: FileSystemNotFoundException => 0
+    }
+  }
+
 }
 
 object Stamps {
