@@ -12,7 +12,7 @@ package inc
 import sbt.io.IO
 import java.io.File
 import java.net.URI
-import java.nio.file.{ FileSystems, FileSystem, Files }
+import java.nio.file.{ FileSystems, FileSystem, Files, FileSystemNotFoundException }
 import java.util.Optional
 
 import collection.mutable
@@ -147,12 +147,18 @@ object ClassFileManager {
   }
 
   private def removeFromZip(zip: URI, classes: Array[String]): Unit = {
-    val env = new java.util.HashMap[String, String]
-    val fs = FileSystems.newFileSystem(zip, env)
-    classes.foreach { cls =>
-      Files.delete(fs.getPath(cls))
+    try {
+      val env = new java.util.HashMap[String, String]
+      val fs = FileSystems.newFileSystem(zip, env)
+      classes.foreach { cls =>
+        Files.delete(fs.getPath(cls))
+      }
+      fs.close()
+    } catch {
+      case _: FileSystemNotFoundException =>
+      // file does not exist due to compilation error
+      // if it would be created we would need to remove all entries anyway.
     }
-    fs.close()
   }
 
   private def groupByJars(jared: Array[File]) = {

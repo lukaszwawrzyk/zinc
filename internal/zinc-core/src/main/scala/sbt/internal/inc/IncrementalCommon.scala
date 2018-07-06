@@ -142,9 +142,18 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
   private def withPreviousJar[A](output: Output)(action: => A): A = {
     val outputJar = output.getSingleOutput.get
     val prevJar = new File(outputJar.toString.dropRight(4) + "~.jar")
-    if (outputJar.exists()) IO.move(outputJar, prevJar)
+    if (outputJar.exists()) {
+      IO.move(outputJar, prevJar)
+    }
 
-    val res = action
+    val res = try action
+    catch {
+      case e: Exception =>
+        if (prevJar.exists()) {
+          IO.move(prevJar, outputJar)
+        }
+        throw e
+    }
 
     if (prevJar.exists()) {
       mergeJars(into = prevJar, from = outputJar)
