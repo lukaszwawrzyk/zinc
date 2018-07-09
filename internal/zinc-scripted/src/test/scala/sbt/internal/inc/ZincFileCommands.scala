@@ -1,9 +1,11 @@
 package sbt.internal.inc
 
 import java.io.File
-import java.net.URL
+import java.net.{ URL, URI }
+import java.nio.file.{ Files, FileSystem }
 
 import sbt.internal.scripted.FileCommands
+import sbt.io.IO
 
 class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) {
   override def commandMap: Map[String, List[String] => Unit] = {
@@ -25,7 +27,15 @@ class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) 
       scriptError("File(s) existed: " + present.mkString("[ ", " , ", " ]"))
   }
 
-  override def newer(a: String, b: String): Unit = super.newer(a, b)
+  override def newer(a: String, b: String): Unit = {
+    val pathA = fromString(a)
+    val pathB = fromString(b)
+    val isNewer = pathA.exists &&
+      (!pathB.exists || IO.getModifiedTimeOrZero(pathA) > IO.getModifiedTimeOrZero(pathB))
+    if (!isNewer) {
+      scriptError(s"$pathA is not newer than $pathB")
+    }
+  }
 
   override def exists(paths: List[String]): Unit = {
     val (jars, regular) = paths.partition(_.startsWith("jar:file"))
@@ -38,7 +48,11 @@ class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) 
   def existsInJar(url: String): Boolean = {
     val Array(jarPath, filePath) = url.stripPrefix("jar:file").split("!")
     val absJarPath = new File(baseDirectory, jarPath).getPath
-    val absoluteUrl = s"jar:file$absJarPath!$filePath"
-    new URL(absoluteUrl).openConnection().getContentLength >= 0
+    val absoluteJarUri = s"jar:file$absJarPath"
+
+    STJUtil.withZipFs(URI.create(absoluteJarUri)) { fs =>
+      Files.exists(fs.getPath(filePath))
+    }
   }
+
 }

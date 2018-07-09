@@ -9,6 +9,7 @@ package xsbt
 
 import java.io.File
 import java.net.URI
+import java.nio.file.{ FileSystems, FileSystem, Files }
 
 import scala.tools.nsc.Phase
 
@@ -20,6 +21,7 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
 
   def newPhase(prev: Phase): Phase = new AnalyzerPhase(prev)
   private class AnalyzerPhase(prev: Phase) extends GlobalPhase(prev) {
+    println(">>>> INITED ANALYZER PHASE ")
     override def description =
       "Finds concrete instances of provided superclasses, and application entry points."
     def name = Analyzer.name
@@ -29,6 +31,7 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         // build list of generated classes
         for (iclass <- unit.icode) {
           val sym = iclass.symbol
+          println(s"~~~~ Adding $sym")
           def addGenerated(separatorRequired: Boolean): Unit = {
             locatePlainClassFile(sym, separatorRequired)
               .orElse(locateClassInJar(sym, separatorRequired))
@@ -70,16 +73,46 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       .find(_.exists)
   }
 
-  private def locateClassInJar(sym: Symbol, separatorRequired: Boolean) = {
-    outputDirs.flatMap { jarFile =>
+  private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
+    val magicFile = new File("MAGIC")
+    val res = outputDirs.flatMap { jarFile =>
       val relativeFile =
         fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2)
       val uri = "jar:file:" + jarFile.toString + "!/" + relativeFile
       val file = new File(uri)
-      if (new URI(uri).toURL.openConnection().getContentLength != -1) {
+      if (existsInJar(uri)) {
+        println(s"><><><>< Located $uri")
         Some(file)
-      } else None
+      } else {
+        val x = scala.io.StdIn.readLine(s"<><><><> Failed to locate $uri in jar, will retry")
+        if (x == "stop") Some(magicFile) else None
+      }
     }.headOption
+
+    if (res.isEmpty) {
+      locateClassInJar(sym, separatorRequired)
+    } else {
+      res.filterNot(_ == magicFile)
+    }
+  }
+
+  private def existsInJar(uri: String): Boolean = {
+    val Array(jar, cls) = uri.split("!")
+    STJUtil.withZipFs(URI.create(jar)) { fs: FileSystem =>
+      Files.exists(fs.getPath(cls))
+    }
+  }
+
+  private object STJUtil {
+    def withZipFs[A](uri: URI)(action: FileSystem => A): A = {
+      val env = new java.util.HashMap[String, String]
+      synchronized {
+        val fs = FileSystems.newFileSystem(uri, env)
+        try action(fs)
+        finally fs.close()
+      }
+    }
+
   }
 
 }
