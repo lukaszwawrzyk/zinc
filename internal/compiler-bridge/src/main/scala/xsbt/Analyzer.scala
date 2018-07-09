@@ -21,7 +21,6 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
 
   def newPhase(prev: Phase): Phase = new AnalyzerPhase(prev)
   private class AnalyzerPhase(prev: Phase) extends GlobalPhase(prev) {
-    println(">>>> INITED ANALYZER PHASE ")
     override def description =
       "Finds concrete instances of provided superclasses, and application entry points."
     def name = Analyzer.name
@@ -31,7 +30,6 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         // build list of generated classes
         for (iclass <- unit.icode) {
           val sym = iclass.symbol
-          println(s"~~~~ Adding $sym")
           def addGenerated(separatorRequired: Boolean): Unit = {
             locatePlainClassFile(sym, separatorRequired)
               .orElse(locateClassInJar(sym, separatorRequired))
@@ -67,15 +65,14 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
     }
   }
 
-  private def locatePlainClassFile(sym: Symbol, separatorRequired: Boolean) = {
+  private def locatePlainClassFile(sym: Symbol, separatorRequired: Boolean): Option[File] = {
     outputDirs
       .map(fileForClass(_, sym, separatorRequired))
       .find(_.exists)
   }
 
   private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
-    val magicFile = new File("MAGIC")
-    val res = outputDirs.flatMap { jarFile =>
+    outputDirs.flatMap { jarFile =>
       val relativeFile =
         fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2)
       val uri = "jar:file:" + jarFile.toString + "!/" + relativeFile
@@ -84,16 +81,10 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         println(s"><><><>< Located $uri")
         Some(file)
       } else {
-        val x = scala.io.StdIn.readLine(s"<><><><> Failed to locate $uri in jar, will retry")
-        if (x == "stop") Some(magicFile) else None
+        println(s"<><><><> Failed to locate $uri in jar, will retry")
+        None
       }
     }.headOption
-
-    if (res.isEmpty) {
-      locateClassInJar(sym, separatorRequired)
-    } else {
-      res.filterNot(_ == magicFile)
-    }
   }
 
   private def existsInJar(uri: String): Boolean = {

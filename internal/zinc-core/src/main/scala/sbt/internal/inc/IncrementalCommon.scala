@@ -156,32 +156,11 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     }
 
     if (prevJar.exists()) {
-      mergeJars(into = prevJar, from = outputJar)
+      STJUtil.mergeJars(into = prevJar, from = outputJar)
       IO.move(prevJar, outputJar)
     }
 
     res
-  }
-
-  private def mergeJars(into: File, from: File) = {
-    val parent = into.toPath.getParent
-    val intoTmpDir = parent.resolve("intotmp")
-    val fromTmpDir = parent.resolve("fromtmp")
-    val script =
-      s"""mkdir $intoTmpDir
-         |mkdir $fromTmpDir
-         |(cd $intoTmpDir; unzip $into)
-         |(cd $fromTmpDir; unzip $from)
-         |rsync -a $fromTmpDir/ $intoTmpDir/
-         |rm -rf $into
-         |jar -cvf $into -C $intoTmpDir .
-         |rm -rf $intoTmpDir $fromTmpDir
-      """.stripMargin
-    val scriptFile = parent.resolve("script.sh")
-    Files.write(scriptFile, script.getBytes, StandardOpenOption.CREATE, StandardOpenOption.WRITE)
-    import scala.sys.process._
-    s"bash $scriptFile".!
-    Files.deleteIfExists(scriptFile)
   }
 
   private[this] def emptyChanges: DependencyChanges = new DependencyChanges {
@@ -288,7 +267,11 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
 
     val removedProducts = lookup.removedProducts(previousAnalysis).getOrElse {
       previous.allProducts
-        .filter(p => !equivS.equiv(previous.product(p), current.product(p)))
+        .filter(p => {
+          val res = !equivS.equiv(previous.product(p), current.product(p))
+          println(s"comparing for $p ${previous.product(p)} and ${current.product(p)} = ${!res}")
+          res
+        })
         .toSet
     }
 
@@ -399,21 +382,37 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
       log.debug("Full compilation, no sources in previous analysis.")
     else if (allInvalidatedClasses.isEmpty && allInvalidatedSourcefiles.isEmpty)
       log.debug("No changes")
-    else
+    else {
+      def color(s: String) = Console.YELLOW + s + Console.RESET
       log.debug(
-        "\nInitial source changes: \n\tremoved:" + removedSrcs + "\n\tadded: " + addedSrcs + "\n\tmodified: " + modifiedSrcs +
-          "\nInvalidated products: " + changes.removedProducts +
-          "\nExternal API changes: " + changes.external +
-          "\nModified binary dependencies: " + changes.binaryDeps +
-          "\nInitial directly invalidated classes: " + invalidatedClasses +
-          "\n\nSources indirectly invalidated by:" +
-          "\n\tproduct: " + byProduct +
-          "\n\tbinary dep: " + byBinaryDep +
-          "\n\texternal source: " + byExtSrcDep
+        s"""
+           |${color("Initial source changes")}:
+           |  ${color("removed")}: ${showSet(removedSrcs, baseIndent = "  ")}
+           |  ${color("added")}: ${showSet(addedSrcs, baseIndent = "  ")}
+           |  ${color("modified")}: ${showSet(modifiedSrcs, baseIndent = "  ")}
+           |${color("Invalidated products")}: ${showSet(changes.removedProducts)}
+           |${color("External API changes")}: ${changes.external}
+           |${color("Modified binary dependencies")}: ${changes.binaryDeps}
+           |${color("Initial directly invalidated classes")}: $invalidatedClasses
+           |
+           |${color("Sources indirectly invalidated by")}:
+           |  ${color("product")}: ${showSet(byProduct, baseIndent = "  ")}
+           |  ${color("binary dep")}: ${showSet(byBinaryDep, baseIndent = "  ")}
+           |  ${color("external source")}: ${showSet(byExtSrcDep, baseIndent = "  ")}""".stripMargin
       )
+    }
 
     (allInvalidatedClasses, allInvalidatedSourcefiles)
   }
+
+  private def showSet[A](s: Set[A], baseIndent: String = ""): String = {
+    if (s.isEmpty) {
+      "[]"
+    } else {
+      s.map(baseIndent + "  " + _.toString).mkString("[\n", ",\n", "\n" + baseIndent + "]")
+    }
+  }
+
   private[this] def checkAbsolute(addedSources: List[File]): Unit =
     if (addedSources.nonEmpty) {
       addedSources.filterNot(_.isAbsolute) match {

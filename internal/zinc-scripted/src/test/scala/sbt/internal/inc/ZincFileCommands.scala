@@ -46,9 +46,9 @@ class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) 
   }
 
   def existsInJar(url: String): Boolean = {
-    val Array(jarPath, filePath) = url.stripPrefix("jar:file").split("!")
+    val Array(jarPath, filePath) = url.stripPrefix("jar:file:").split("!")
     val absJarPath = new File(baseDirectory, jarPath).getPath
-    val absoluteJarUri = s"jar:file$absJarPath"
+    val absoluteJarUri = s"jar:file:$absJarPath"
 
     STJUtil.withZipFs(URI.create(absoluteJarUri)) { fs =>
       Files.exists(fs.getPath(filePath))

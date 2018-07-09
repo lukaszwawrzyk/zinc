@@ -12,8 +12,8 @@ package inc
 import sbt.io.IO
 import java.io.File
 import java.net.URI
-import java.nio.file.{ FileSystems, FileSystem, Files, FileSystemNotFoundException }
-import java.util.Optional
+import java.nio.file._
+import java.util.{ Optional, UUID }
 
 import collection.mutable
 import xsbti.compile.{
@@ -51,7 +51,7 @@ object ClassFileManager {
       IO.deleteFilesEmptyDirs(regular)
       groupByJars(jared).foreach {
         case (jar, classes) =>
-          removeFromZip(URI.create(jar), classes)
+          removeFromZip(jar, classes)
       }
 
     }
@@ -86,31 +86,52 @@ object ClassFileManager {
 
     private[this] val generatedClasses = new mutable.HashSet[File]
     private[this] val movedClasses = new mutable.HashMap[File, File]
+    private[this] val movedJaredClasses = new mutable.HashMap[File, File]
+    private[this] val realToTmpJars = new mutable.HashMap[URI, URI]
 
     private def showFiles(files: Iterable[File]): String =
       files.map(f => s"\t$f").mkString("\n")
 
     override def delete(classes: Array[File]): Unit = {
-      logger.debug(s"About to delete class files:\n${showFiles(classes)}")
+      println(s"About to delete class files:\n${showFiles(classes)}")
       val (jared, regular) = splitToClassesAndJars(classes)
 
-      val toBeBackedUp =
-        regular.filter(c => c.exists && !movedClasses.contains(c) && !generatedClasses(c))
-      logger.debug(s"We backup class files:\n${showFiles(toBeBackedUp)}")
-      for (c <- toBeBackedUp) {
-        movedClasses.put(c, move(c))
-      }
-      IO.deleteFilesEmptyDirs(regular)
-
-      val jars = getJars(jared)
-      jars.foreach { jar =>
-        movedClasses.put(jar, copy(jar))
-      }
-      groupByJars(jared).foreach {
-        case (jar, classes) =>
-          removeFromZip(URI.create(jar), classes)
+      locally {
+        val toBeBackedUp =
+          regular.filter(c => c.exists && !movedClasses.contains(c) && !generatedClasses(c))
+        println(s"We backup class files:\n${showFiles(toBeBackedUp)}")
+        for (c <- toBeBackedUp) {
+          movedClasses.put(c, move(c))
+        }
+        IO.deleteFilesEmptyDirs(regular)
       }
 
+      locally {
+        val toBeBackedUp =
+          jared.filter(c => !movedJaredClasses.contains(c) && !generatedClasses.contains(c))
+        println(s"We backup jared class files:\n${showFiles(toBeBackedUp)}")
+
+        groupByJars(toBeBackedUp).foreach {
+          case (jar, classes) =>
+            val targetJar = realToTmpJars.getOrElse(
+              jar,
+              URI.create(
+                "jar:file:" + new File(tempDir, UUID.randomUUID.toString + ".jar").toString))
+            // copy to target jar all classes
+            for (c <- classes) {
+              movedJaredClasses.put(new File(jar.toString + "!" + c), new File(targetJar.toString))
+
+              STJUtil.withZipFs(jar) { srcFs =>
+                STJUtil.withZipFs(targetJar, create = true) { destFs =>
+                  Files.copy(srcFs.getPath(c), destFs.getPath(c))
+                }
+              }
+            }
+            // maybe "move" should be handled as I am copying but probably handled by next line
+            println(s"Removing ${classes.toList.mkString("\n")} from $jar")
+            removeFromZip(jar, classes)
+        }
+      }
     }
 
     override def generated(classes: Array[File]): Unit = {
@@ -123,10 +144,26 @@ object ClassFileManager {
       if (!success) {
         logger.debug("Rolling back changes to class files.")
         logger.debug(s"Removing generated classes:\n${showFiles(generatedClasses)}")
-        IO.deleteFilesEmptyDirs(generatedClasses)
+        locally {
+          val (jared, regular) = splitToClassesAndJars(generatedClasses)
+          IO.deleteFilesEmptyDirs(regular)
+          groupByJars(jared).foreach {
+            case (jar, classes) => removeFromZip(jar, classes)
+          }
+        }
+
         logger.debug(s"Restoring class files: \n${showFiles(movedClasses.keys)}")
-        IO.deleteFilesEmptyDirs(getJars(generatedClasses.toArray))
         for ((orig, tmp) <- movedClasses) IO.move(tmp, orig)
+
+        val toMove = movedJaredClasses.toSeq.map {
+          case (srcFile, tmpJar) =>
+            val srcJar = new File(srcFile.toString.split("!")(0).stripPrefix("jar:file:"))
+            (srcJar, new File(tmpJar.toString.stripPrefix("jar:file:")))
+        }.distinct
+        toMove.foreach {
+          case (srcJar, tmpJar) =>
+            STJUtil.mergeJars(into = srcJar, from = tmpJar)
+        }
       }
       logger.debug(s"Removing the temporary directory used for backing up class files: $tempDir")
       IO.delete(tempDir)
@@ -137,16 +174,9 @@ object ClassFileManager {
       IO.move(c, target)
       target
     }
-
-    def copy(c: File): File = {
-      val target = File.createTempFile("sbt", ".jar", tempDir)
-      IO.copy(Seq(c -> target))
-      target
-    }
-
   }
 
-  private def removeFromZip(zip: URI, classes: Array[String]): Unit = {
+  private def removeFromZip(zip: URI, classes: Iterable[String]): Unit = {
     try {
       val env = new java.util.HashMap[String, String]
       val fs = FileSystems.newFileSystem(zip, env)
@@ -161,22 +191,16 @@ object ClassFileManager {
     }
   }
 
-  private def groupByJars(jared: Array[File]) = {
+  private def groupByJars(jared: Iterable[File]): Map[URI, Iterable[String]] = {
     jared
       .map(_.toString.split("!"))
       .collect { case Array(jar, classFile) => (jar, classFile) }
       .groupBy(_._1)
       .mapValues(_.map(_._2))
+      .map { case (k, v) => URI.create(k) -> v }
   }
 
-  private def getJars(jared: Array[File]) = {
-    jared
-      .map(_.toString.split("!"))
-      .collect { case Array(jar, classFile) => new File(jar.stripPrefix("jar:file")) }
-      .distinct
-  }
-
-  private def splitToClassesAndJars(classes: Array[File]) = {
+  private def splitToClassesAndJars(classes: Iterable[File]) = {
     classes.partition(_.toString.startsWith("jar:file:"))
   }
 
