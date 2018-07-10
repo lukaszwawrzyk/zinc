@@ -25,6 +25,7 @@ import xsbti.compile.{
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 
 import scala.annotation.tailrec
+import scala.util.Random
 
 private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options: IncOptions) {
 
@@ -141,7 +142,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
 
   private def withPreviousJar[A](output: Output)(action: => A): A = {
     val outputJar = output.getSingleOutput.get
-    val prevJar = new File(outputJar.toString.dropRight(4) + "~.jar")
+    val prevJar = new File(outputJar.toString.replace(".jar", s"_${Random.nextInt(31) + 1}.jar"))
     if (outputJar.exists()) {
       IO.move(outputJar, prevJar)
     }

@@ -78,10 +78,8 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       val uri = "jar:file:" + jarFile.toString + "!/" + relativeFile
       val file = new File(uri)
       if (existsInJar(uri)) {
-        println(s"><><><>< Located $uri")
         Some(file)
       } else {
-        println(s"<><><><> Failed to locate $uri in jar, will retry")
         None
       }
     }.headOption

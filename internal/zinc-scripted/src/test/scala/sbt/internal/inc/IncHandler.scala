@@ -392,20 +392,22 @@ case class ProjectStructure(
                                optionProgress = None,
                                extra)
 
-    val tmpOutputJar = file(outputJar.toString.replace(".jar", "~.jar"))
+    val tmpOutputJar = (1 to 32).map(i => file(outputJar.toString.replace(".jar", s"_$i.jar")))
     val classpath =
-      (i.si.allJars.toList ++ (unmanagedJars :+ classesDir :+ outputJar :+ tmpOutputJar) ++ internalClasspath).toArray
-    val in = compiler.inputs(classpath,
-                             sources.toArray,
-                             outputJar,
-                             scalacOptions,
-                             Array(),
-                             maxErrors,
-                             Array(),
-                             CompileOrder.Mixed,
-                             cs,
-                             setup,
-                             prev0)
+      (tmpOutputJar ++ List(outputJar) ++ i.si.allJars.toList ++ unmanagedJars ++ internalClasspath).toArray
+    val in = compiler.inputs(
+      classpath,
+      sources.toArray,
+      outputJar,
+      scalacOptions ++ Array("-Dscala.classpath.closeZip=true", "-YdisableFlatCpCaching"),
+      Array(),
+      maxErrors,
+      Array(),
+      CompileOrder.Mixed,
+      cs,
+      setup,
+      prev0
+    )
     val result = compiler.compile(in, scriptedLog)
     val analysis = result.analysis match { case a: Analysis => a }
     fileStore.set(AnalysisContents.create(analysis, result.setup))
