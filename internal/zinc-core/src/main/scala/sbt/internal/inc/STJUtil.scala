@@ -2,7 +2,10 @@ package sbt.internal.inc
 
 import java.io.File
 import java.net.URI
-import java.nio.file.{ FileSystems, FileSystem, Files, StandardOpenOption }
+import java.nio.file._
+import java.util.function.Consumer
+
+import scala.collection.mutable.ListBuffer
 
 object STJUtil {
 
@@ -16,7 +19,11 @@ object STJUtil {
     }
   }
 
-  def mergeJars(into: File, from: File) = {
+  def withZipFs[A](file: File)(action: FileSystem => A): A = {
+    withZipFs(URI.create("jar:file:" + file.getPath), create = false)(action)
+  }
+
+  def mergeJarsSh(into: File, from: File) = {
     val parent = into.toPath.getParent
     val intoTmpDir = parent.resolve("intotmp")
     val fromTmpDir = parent.resolve("fromtmp")
@@ -35,6 +42,42 @@ object STJUtil {
     import scala.sys.process._
     s"bash $scriptFile".!
     Files.deleteIfExists(scriptFile)
+  }
+
+  def mergeJars(into: File, from: File) = {
+    withZipFs(into) { intoFs =>
+      withZipFs(from) { fromFs =>
+        Files
+          .walk(fromFs.getPath("/"))
+          .forEachOrdered(new Consumer[Path] {
+            override def accept(t: Path): Unit = {
+              if (Files.isDirectory(t)) {
+                Files.createDirectories(intoFs.getPath(t.toString))
+              } else {
+                Files.copy(t,
+                           intoFs.getPath(t.toString),
+                           StandardCopyOption.COPY_ATTRIBUTES,
+                           StandardCopyOption.REPLACE_EXISTING)
+              }
+            }
+          })
+      }
+    }
+    from.delete()
+  }
+
+  def listFiles(f: File): Seq[String] = {
+    if (f.exists()) {
+      withZipFs(f) { fs =>
+        val list = new ListBuffer[Path]
+        Files
+          .walk(fs.getPath("/"))
+          .forEachOrdered(new Consumer[Path] {
+            override def accept(t: Path): Unit = list += t
+          })
+        list.map(_.toString)
+      }
+    } else Nil
   }
 
 }
