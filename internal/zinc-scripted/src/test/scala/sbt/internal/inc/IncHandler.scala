@@ -10,7 +10,7 @@ import sbt.util.Logger
 import sbt.util.InterfaceUtil._
 import sbt.internal.inc.JavaInterfaceUtil.{ EnrichOptional, EnrichOption }
 import xsbt.api.Discovery
-import xsbti.{ Problem, Severity, Reporter }
+import xsbti.{ Reporter, Problem, Severity }
 import xsbti.compile.{
   AnalysisContents,
   IncOptionsUtil,
@@ -33,6 +33,7 @@ import sbt.io.syntax._
 import sbt.io.DirectoryFilter
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier.{ isStatic, isPublic }
+import java.nio.file.Files
 import java.util.{ Properties, Optional }
 
 import sbt.internal.inc.classpath.{ ClassLoaderCache, ClasspathUtilities }
@@ -350,9 +351,11 @@ case class ProjectStructure(
   }
 
   def checkNoGeneratedClassFiles(): Unit = {
-    val allClassFiles = generatedClassFiles.get.mkString("\n\t")
-    if (!allClassFiles.isEmpty)
-      sys.error(s"Classes existed:\n\t$allClassFiles")
+    val allClassFiles = generatedClassFiles.get
+    val allJaredClassFiles = STJUtil.listFiles(outputJar).filter(_.endsWith(".class"))
+    if (allClassFiles.nonEmpty || allJaredClassFiles.nonEmpty)
+      sys.error(
+        s"Classes existed:\n\t${allClassFiles.mkString("\n\t")} \n\t${allJaredClassFiles.mkString("\n\t")}")
   }
 
   def checkDependencies(i: IncInstance, className: String, expected: List[String]): Unit = {
