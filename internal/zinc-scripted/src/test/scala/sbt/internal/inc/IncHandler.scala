@@ -264,7 +264,9 @@ case class ProjectStructure(
     f1 orElse { case _ => None }
   }
   def dependsOnRef: Vector[ProjectStructure] = dependsOn map { lookupProject(_) }
-  def internalClasspath: Vector[File] = dependsOnRef map { _.classesDir }
+  def internalClasspath: Vector[File] = dependsOnRef flatMap { proj =>
+    Vector(proj.classesDir, proj.outputJar)
+  }
 
   def checkSame(i: IncInstance): Unit =
     fileStore.get.toOption match {
