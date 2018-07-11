@@ -260,7 +260,6 @@ private final class AnalysisCallback(
                              classFile: File,
                              binaryClassName: String,
                              srcClassName: String): Unit = {
-    println(s"XXX generalted non local $source, $classFile, $binaryClassName $srcClassName")
     add(nonLocalClasses, source, (classFile, binaryClassName))
     add(classNames, source, (srcClassName, binaryClassName))
     classToSource.put(classFile, srcClassName)

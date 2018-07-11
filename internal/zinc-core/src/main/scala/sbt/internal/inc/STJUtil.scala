@@ -20,10 +20,10 @@ object STJUtil {
   }
 
   def withZipFs[A](file: File)(action: FileSystem => A): A = {
-    withZipFs(URI.create("jar:file:" + file.getPath), create = false)(action)
+    withZipFs(URI.create("jar:file:" + file.getPath))(action)
   }
 
-  def mergeJarsSh(into: File, from: File) = {
+  def mergeJarsSh(into: File, from: File): Unit = {
     val parent = into.toPath.getParent
     val intoTmpDir = parent.resolve("intotmp")
     val fromTmpDir = parent.resolve("fromtmp")
@@ -44,7 +44,7 @@ object STJUtil {
     Files.deleteIfExists(scriptFile)
   }
 
-  def mergeJars(into: File, from: File) = {
+  def mergeJars(into: File, from: File): Unit = {
     withZipFs(into) { intoFs =>
       withZipFs(from) { fromFs =>
         Files
@@ -78,6 +78,18 @@ object STJUtil {
         list.map(_.toString)
       }
     } else Nil
+  }
+
+  def existsInJar(uri: String): Boolean = {
+    val Array(jar, cls) = uri.split("!")
+    try {
+      STJUtil.withZipFs(URI.create(jar)) { fs: FileSystem =>
+        Files.exists(fs.getPath(cls))
+      }
+    } catch {
+      case _: FileSystemNotFoundException =>
+        false
+    }
   }
 
 }

@@ -13,7 +13,7 @@ import sbt.io.IO
 import java.io.File
 import java.net.URI
 import java.nio.file._
-import java.util.{ Optional, UUID }
+import java.util.{ UUID, Optional }
 
 import collection.mutable
 import xsbti.compile.{
@@ -122,10 +122,13 @@ object ClassFileManager {
               movedJaredClasses.put(new File(jar.toString + "!" + c), new File(targetJar.toString))
 
               STJUtil.withZipFs(jar) { srcFs =>
-                STJUtil.withZipFs(targetJar, create = true) { destFs =>
-                  Files.copy(srcFs.getPath(c),
-                             destFs.getPath(c),
-                             StandardCopyOption.COPY_ATTRIBUTES)
+                STJUtil.withZipFs(targetJar, create = true) { dstFs =>
+                  val src = srcFs.getPath(c)
+                  val dst = dstFs.getPath(c)
+                  if (!Files.isDirectory(src)) {
+                    Files.createDirectories(dst.getParent)
+                  }
+                  Files.copy(src, dst, StandardCopyOption.COPY_ATTRIBUTES)
                 }
               }
             }
