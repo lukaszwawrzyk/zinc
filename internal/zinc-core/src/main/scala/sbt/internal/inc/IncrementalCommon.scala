@@ -157,8 +157,13 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     }
 
     if (prevJar.exists()) {
-      STJUtil.mergeJars(into = prevJar, from = outputJar)
-      IO.move(prevJar, outputJar)
+      if (outputJar.exists()) {
+        STJUtil.mergeJars(into = prevJar, from = outputJar)
+        IO.move(prevJar, outputJar)
+      } else {
+        // Java only compilation case - probably temporary as java should go to jar as well
+        IO.move(prevJar, outputJar)
+      }
     }
 
     res

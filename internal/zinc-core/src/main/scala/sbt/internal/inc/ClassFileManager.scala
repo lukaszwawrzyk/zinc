@@ -89,8 +89,13 @@ object ClassFileManager {
     private[this] val movedJaredClasses = new mutable.HashMap[File, File]
     private[this] val realToTmpJars = new mutable.HashMap[URI, URI]
 
-    private def showFiles(files: Iterable[File]): String =
-      files.map(f => s"\t$f").mkString("\n")
+    private def showFiles(files: Iterable[File]): String = {
+      if (files.isEmpty) {
+        "[]"
+      } else {
+        files.map(f => s"\t$f").mkString("\n")
+      }
+    }
 
     override def delete(classes: Array[File]): Unit = {
       show(s"About to delete class files:\n${showFiles(classes)}")
@@ -108,7 +113,10 @@ object ClassFileManager {
 
       locally {
         val toBeBackedUp =
-          jared.filter(c => !movedJaredClasses.contains(c) && !generatedClasses.contains(c))
+          jared.filter(
+            c =>
+              STJUtil.existsInJar(c.toString) && !movedJaredClasses.contains(c) && !generatedClasses
+                .contains(c))
         show(s"We backup jared class files:\n${showFiles(toBeBackedUp)}")
 
         groupByJars(toBeBackedUp).foreach {
