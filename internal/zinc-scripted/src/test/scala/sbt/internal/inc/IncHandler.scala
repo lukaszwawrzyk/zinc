@@ -397,9 +397,8 @@ case class ProjectStructure(
                                optionProgress = None,
                                extra)
 
-    val tmpOutputJar = (1 to 32).map(i => file(outputJar.toString.replace(".jar", s"_$i.jar")))
     val classpath =
-      (tmpOutputJar ++ List(outputJar, classesDir) ++ i.si.allJars.toList ++ unmanagedJars ++ internalClasspath).toArray
+      (List(outputJar) ++ i.si.allJars.toList ++ unmanagedJars ++ internalClasspath).toArray
     val in = compiler.inputs(
       classpath,
       sources.toArray,

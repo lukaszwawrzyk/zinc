@@ -240,11 +240,23 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         case Some(previous) => previous
         case None           => Analysis.empty
       }
+
+      val tmpOutputJars = output match {
+        case s: SingleOutput =>
+          val output = s.getSingleOutput.get()
+          if (output.toString.endsWith(".jar")) {
+            (1 to 32).map(i => new File(output.toString.replace(".jar", s"_$i.jar"))) :+ new File(
+              output.getParent) // for java
+          } else Seq.empty
+        case _ =>
+          Seq.empty
+      }
+
       val config = MixedAnalyzingCompiler.makeConfig(
         scalaCompiler,
         javaCompiler,
         sources,
-        classpath,
+        tmpOutputJars ++ classpath,
         output,
         cache,
         progress,
