@@ -74,8 +74,8 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
   private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
     outputDirs.flatMap { jarFile =>
       val relativeFile =
-        fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2)
-      val uri = "jar:file:" + jarFile.toString + "!/" + relativeFile
+        fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2).replace("\\", "/")
+      val uri = "jar:" + jarFile.toPath.toUri.toString + "!/" + relativeFile
       val file = new File(uri)
       if (existsInJar(uri)) {
         Some(file)

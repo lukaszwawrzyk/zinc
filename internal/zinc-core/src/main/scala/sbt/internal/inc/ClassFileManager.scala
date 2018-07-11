@@ -124,7 +124,7 @@ object ClassFileManager {
             val targetJar = realToTmpJars.getOrElse(
               jar,
               URI.create(
-                "jar:file:" + new File(tempDir, UUID.randomUUID.toString + ".jar").toString))
+                "jar:" + new File(tempDir, UUID.randomUUID.toString + ".jar").toURI.toString))
             // copy to target jar all classes
             for (c <- classes) {
               movedJaredClasses.put(new File(jar.toString + "!" + c), new File(targetJar.toString))
