@@ -74,10 +74,10 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
   private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
     outputDirs.flatMap { jarFile =>
       val relativeFile =
-        fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2).replace("\\", "/")
-      val uri = "jar:" + jarFile.toPath.toUri.toString + "!/" + relativeFile
+        fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2)
+      val uri = STJUtil.init(jarFile, relativeFile)
       val file = new File(uri)
-      if (existsInJar(uri)) {
+      if (STJUtil.existsInJar(uri)) {
         Some(file)
       } else {
         None
@@ -85,14 +85,27 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
     }.headOption
   }
 
-  private def existsInJar(uri: String): Boolean = {
-    val Array(jar, cls) = uri.split("!")
-    STJUtil.withZipFs(URI.create(jar)) { fs: FileSystem =>
-      Files.exists(fs.getPath(cls))
-    }
-  }
-
   private object STJUtil {
+    def isWindows = System.getProperty("os.name").toLowerCase.contains("win")
+
+    private val prefix = "jar#"
+
+    def init(jar: File, cls: String): String = prefix + jar + "!" + cls.replace("\\", "/")
+    def toJarUriAndFile(s: String): (URI, String) = {
+      val Array(jar0, cls) = s.stripPrefix(prefix).split("!")
+      val jar = if (isWindows) "/" + jar0.replace("\\", "/") else jar0
+      val uri = URI.create("jar:file:" + jar)
+      val path = "/" + cls.replace("\\", "/")
+      (uri, path)
+    }
+
+    def existsInJar(s: String): Boolean = {
+      val (uri, cls) = toJarUriAndFile(s)
+      STJUtil.withZipFs(uri) { fs: FileSystem =>
+        Files.exists(fs.getPath(cls))
+      }
+    }
+
     def withZipFs[A](uri: URI)(action: FileSystem => A): A = {
       val env = new java.util.HashMap[String, String]
       synchronized {
@@ -101,7 +114,6 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         finally fs.close()
       }
     }
-
   }
 
 }

@@ -145,28 +145,7 @@ object Stamper {
 
   val forHash = (toStamp: File) => tryStamp(Hash.ofFile(toStamp))
   val forLastModified = { toStamp: File =>
-    tryStamp(new LastModified(getModifiedTimeOrZero(toStamp)))
-  }
-
-  private def getModifiedTimeOrZero(file: File): Long = {
-    if (file.exists()) {
-      IO.getModifiedTimeOrZero(file)
-    } else if (file.getPath.startsWith("jar:file")) {
-      readModifiedTimeFromZip(file.getPath)
-    } else {
-      0
-    }
-  }
-
-  private def readModifiedTimeFromZip(uri: String): Long = {
-    try {
-      val Array(zip, file) = uri.split("!")
-      STJUtil.withZipFs(URI.create(zip)) { fs =>
-        Files.getLastModifiedTime(fs.getPath(file)).toMillis
-      }
-    } catch {
-      case _: FileSystemNotFoundException => 0
-    }
+    tryStamp(new LastModified(STJUtil.getModifiedTimeOrZero(toStamp)))
   }
 
 }

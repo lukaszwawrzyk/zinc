@@ -51,7 +51,7 @@ object ClassFileManager {
       IO.deleteFilesEmptyDirs(regular)
       groupByJars(jared).foreach {
         case (jar, classes) =>
-          removeFromZip(jar, classes)
+          removeFromJar(jar, classes)
       }
 
     }
@@ -123,11 +123,11 @@ object ClassFileManager {
           case (jar, classes) =>
             val targetJar = realToTmpJars.getOrElse(
               jar,
-              URI.create(
-                "jar:" + new File(tempDir, UUID.randomUUID.toString + ".jar").toURI.toString))
+              STJUtil.fileToJarUri(new File(tempDir, UUID.randomUUID.toString + ".jar")))
             // copy to target jar all classes
             for (c <- classes) {
-              movedJaredClasses.put(new File(jar.toString + "!" + c), new File(targetJar.toString))
+              movedJaredClasses.put(new File(STJUtil.fromJarUriAndFile(jar, c)),
+                                    new File(targetJar.toString))
 
               STJUtil.withZipFs(jar) { srcFs =>
                 STJUtil.withZipFs(targetJar, create = true) { dstFs =>
@@ -142,7 +142,7 @@ object ClassFileManager {
             }
             // maybe "move" should be handled as I am copying but probably handled by next line
             show(s"Removing ${classes.toList.mkString("\n")} from $jar")
-            removeFromZip(jar, classes)
+            removeFromJar(jar, classes)
         }
       }
     }
@@ -165,17 +165,19 @@ object ClassFileManager {
           val (jared, regular) = splitToClassesAndJars(generatedClasses)
           IO.deleteFilesEmptyDirs(regular)
           groupByJars(jared).foreach {
-            case (jar, classes) => removeFromZip(jar, classes)
+            case (jar, classes) => removeFromJar(jar, classes)
           }
         }
 
         show(s"Restoring class files: \n${showFiles(movedClasses.keys)}")
         for ((orig, tmp) <- movedClasses) IO.move(tmp, orig)
 
+        ///
         val toMove = movedJaredClasses.toSeq.map {
           case (srcFile, tmpJar) =>
-            val srcJar = new File(srcFile.toString.split("!")(0).stripPrefix("jar:file:"))
-            (srcJar, new File(tmpJar.toString.stripPrefix("jar:file:")))
+            // jar# to file
+            val srcJar = STJUtil.rawIdToJarFile(srcFile.toString)
+            (srcJar, STJUtil.jarUriToFile(URI.create(tmpJar.toString)))
         }.distinct
         show(s"Restoring jared class files: \n${showFiles(movedJaredClasses.keys)}")
         toMove.foreach {
@@ -194,14 +196,13 @@ object ClassFileManager {
     }
   }
 
-  private def removeFromZip(zip: URI, classes: Iterable[String]): Unit = {
+  private def removeFromJar(jar: URI, classes: Iterable[String]): Unit = {
     try {
-      val env = new java.util.HashMap[String, String]
-      val fs = FileSystems.newFileSystem(zip, env)
-      classes.foreach { cls =>
-        Files.delete(fs.getPath(cls))
+      STJUtil.withZipFs(jar) { fs =>
+        classes.foreach { cls =>
+          Files.delete(fs.getPath(cls))
+        }
       }
-      fs.close()
     } catch {
       case _: FileSystemNotFoundException =>
       // file does not exist due to compilation error
@@ -211,15 +212,13 @@ object ClassFileManager {
 
   private def groupByJars(jared: Iterable[File]): Map[URI, Iterable[String]] = {
     jared
-      .map(_.toString.split("!"))
-      .collect { case Array(jar, classFile) => (jar, classFile) }
+      .map(f => STJUtil.toJarUriAndFile(f.toString))
       .groupBy(_._1)
       .mapValues(_.map(_._2))
-      .map { case (k, v) => URI.create(k) -> v }
   }
 
   private def splitToClassesAndJars(classes: Iterable[File]) = {
-    classes.partition(_.toString.startsWith("jar:file:"))
+    classes.partition(STJUtil.isJar)
   }
 
 }
