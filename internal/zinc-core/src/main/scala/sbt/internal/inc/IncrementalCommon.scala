@@ -29,6 +29,8 @@ import scala.util.Random
 
 private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options: IncOptions) {
 
+  import STJUtil.pause
+
   // setting the related system property to true will skip checking that the class name
   // still comes from the same classpath entry.  This can workaround bugs in classpath construction,
   // such as the currently problematic -javabootclasspath.  This is subject to removal at any time.
@@ -119,7 +121,9 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                                      classfileManager: XClassFileManager): (Analysis, Set[File]) = {
     val invalidatedSources = classes.flatMap(previous.relations.definesClass) ++ modifiedSrcs
     val invalidatedSourcesForCompilation = expand(invalidatedSources, allSources)
+    pause("Before prune")
     val pruned = Incremental.prune(invalidatedSourcesForCompilation, previous, classfileManager)
+    pause("After prune")
     debugInnerSection("Pruned")(pruned.relations)
 
     val fresh = withPreviousJar(output) {
@@ -144,23 +148,37 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     val outputJar = output.getSingleOutput.get
     val prevJar = new File(outputJar.toString.replace(".jar", s"_${Random.nextInt(31) + 1}.jar"))
     if (outputJar.exists()) {
+      pause(s"Prev jar set as $prevJar output jar exists so moving it ")
       IO.move(outputJar, prevJar)
+      pause(s"Moved")
     }
 
+    pause("About to run compilation")
     val res = try action
     catch {
       case e: Exception =>
+        pause("Compilation failed")
         if (prevJar.exists()) {
+          pause("Reverting prev jar")
           IO.move(prevJar, outputJar)
+          pause("Reverted prev jar")
         }
         throw e
     }
 
     if (prevJar.exists()) {
       if (outputJar.exists()) {
-        STJUtil.mergeJars(into = prevJar, from = outputJar)
-        IO.move(prevJar, outputJar)
+        val tmpJar = prevJar.toPath.resolveSibling("~~output~~.jar")
+        pause(s"Prev jar and out jar exist so merging those, will copy $prevJar on $tmpJar")
+        Files.copy(prevJar.toPath, tmpJar)
+        pause(s"Prev jar and out jar exist so merging those $tmpJar and $outputJar")
+        STJUtil.mergeJars(into = tmpJar.toFile, from = outputJar)
+
+        pause("merged, moving prevJar on outJar")
+        IO.move(tmpJar.toFile, outputJar)
+        pause("moved")
       } else {
+        pause("java path")
         // Java only compilation case - probably temporary as java should go to jar as well
         IO.move(prevJar, outputJar)
       }

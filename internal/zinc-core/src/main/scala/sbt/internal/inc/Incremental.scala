@@ -75,12 +75,16 @@ object Incremental {
     }
     val (initialInvClasses, initialInvSources) =
       incremental.invalidateInitial(previous.relations, initialChanges)
-    if (initialInvClasses.nonEmpty || initialInvSources.nonEmpty)
-      if (initialInvSources == sources) incremental.log.debug("All sources are invalidated.")
-      else
+
+    if (initialInvClasses.nonEmpty || initialInvSources.nonEmpty) {
+      if (initialInvSources == sources) {
+        incremental.log.debug("All sources are invalidated.")
+      } else {
         incremental.log.debug(
           "All initially invalidated classes: " + initialInvClasses + "\n" +
             "All initially invalidated sources: " + initialInvSources + "\n")
+      }
+    }
     val analysis = manageClassfiles(options) { classfileManager =>
       incremental.cycle(
         initialInvClasses,

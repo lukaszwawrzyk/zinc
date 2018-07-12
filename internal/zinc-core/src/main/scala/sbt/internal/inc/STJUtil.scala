@@ -14,10 +14,20 @@ object STJUtil {
   def withZipFs[A](uri: URI, create: Boolean = false)(action: FileSystem => A): A = {
     val env = new java.util.HashMap[String, String]
     if (create) env.put("create", "true")
-    synchronized {
+    xsbti.ArtifactInfo.SbtOrganization.synchronized {
       val fs = FileSystems.newFileSystem(uri, env)
       try action(fs)
-      finally fs.close()
+      finally {
+        retry(fs.close())
+      }
+    }
+  }
+
+  def retry[A](f: => A): A = {
+    try f
+    catch {
+      case _: FileSystemException =>
+        retry(f)
     }
   }
 
@@ -45,6 +55,11 @@ object STJUtil {
       }
     }
     from.delete()
+  }
+
+  def pause(s: String): Unit = {
+//    scala.io.StdIn.readLine(s)
+    println(s)
   }
 
   // only for debugging

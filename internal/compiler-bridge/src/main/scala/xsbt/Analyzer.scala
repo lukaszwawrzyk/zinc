@@ -104,14 +104,14 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
 
     def existsInJar(s: String): Boolean = {
       val (uri, cls) = toJarUriAndFile(s)
-      STJUtil.withZipFs(uri) { fs: FileSystem =>
+      withZipFs(uri) { fs: FileSystem =>
         Files.exists(fs.getPath(cls))
       }
     }
 
     def withZipFs[A](uri: URI)(action: FileSystem => A): A = {
       val env = new java.util.HashMap[String, String]
-      synchronized {
+      xsbti.ArtifactInfo.SbtOrganization.synchronized {
         val fs = FileSystems.newFileSystem(uri, env)
         try action(fs)
         finally fs.close()
