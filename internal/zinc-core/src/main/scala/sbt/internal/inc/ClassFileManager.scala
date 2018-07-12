@@ -86,7 +86,7 @@ object ClassFileManager {
 
     private[this] val generatedClasses = new mutable.HashSet[File]
     private[this] val movedClasses = new mutable.HashMap[File, File]
-    private[this] val movedJaredClasses = new mutable.HashMap[File, File]
+    private[this] val movedJaredClasses = new mutable.HashMap[File, URI]
     private[this] val realToTmpJars = new mutable.HashMap[URI, URI]
 
     private def showFiles(files: Iterable[File]): String = {
@@ -126,8 +126,7 @@ object ClassFileManager {
               STJUtil.fileToJarUri(new File(tempDir, UUID.randomUUID.toString + ".jar")))
             // copy to target jar all classes
             for (c <- classes) {
-              movedJaredClasses.put(new File(STJUtil.fromJarUriAndFile(jar, c)),
-                                    new File(targetJar.toString))
+              movedJaredClasses.put(new File(STJUtil.fromJarUriAndFile(jar, c)), targetJar)
 
               STJUtil.withZipFs(jar) { srcFs =>
                 STJUtil.withZipFs(targetJar, create = true) { dstFs =>
@@ -177,7 +176,7 @@ object ClassFileManager {
           case (srcFile, tmpJar) =>
             // jar# to file
             val srcJar = STJUtil.rawIdToJarFile(srcFile.toString)
-            (srcJar, STJUtil.jarUriToFile(URI.create(tmpJar.toString)))
+            (srcJar, STJUtil.jarUriToFile(tmpJar))
         }.distinct
         show(s"Restoring jared class files: \n${showFiles(movedJaredClasses.keys)}")
         toMove.foreach {
