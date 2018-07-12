@@ -64,9 +64,7 @@ object STJUtil {
 
   def isWindows = System.getProperty("os.name").toLowerCase.contains("win")
 
-  private val prefix = "jar#"
-
-  def init(jar: File, cls: String): String = prefix + jar + "!" + cls.replace("\\", "/")
+  def init(jar: File, cls: String): String = jar + "!" + cls.replace("\\", "/")
 
   def fromJarUriAndFile(u: URI, f: String): String = {
     val jar = {
@@ -78,7 +76,7 @@ object STJUtil {
   }
 
   def toJarUriAndFile(s: String): (URI, String) = {
-    val Array(jar0, cls) = s.stripPrefix(prefix).split("!")
+    val Array(jar0, cls) = s.split("!")
     val uri = rawPathToJarUri(jar0)
     val path = "/" + cls
     (uri, path)
@@ -98,7 +96,7 @@ object STJUtil {
 
   def rawIdToJarFile(s: String): File = {
     val Array(jar, _) = s.toString.split("!")
-    new File(jar.stripPrefix(prefix))
+    new File(jar)
   }
 
   def fileToJarUri(file: File): URI = {
@@ -127,7 +125,10 @@ object STJUtil {
   }
 
   def isJar(file: File): Boolean = {
-    file.getPath.startsWith(prefix)
+    file.getPath.split("!") match {
+      case Array(jar, cls) if jar.endsWith(".jar") => true
+      case _                                       => false
+    }
   }
 
   private def readModifiedTimeFromJar(s: String): Long = {

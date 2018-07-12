@@ -88,15 +88,18 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
   private object STJUtil {
     def isWindows = System.getProperty("os.name").toLowerCase.contains("win")
 
-    private val prefix = "jar#"
+    def init(jar: File, cls: String): String = jar + "!" + cls.replace("\\", "/")
 
-    def init(jar: File, cls: String): String = prefix + jar + "!" + cls.replace("\\", "/")
     def toJarUriAndFile(s: String): (URI, String) = {
-      val Array(jar0, cls) = s.stripPrefix(prefix).split("!")
-      val jar = if (isWindows) "/" + jar0.replace("\\", "/") else jar0
-      val uri = URI.create("jar:file:" + jar)
-      val path = "/" + cls.replace("\\", "/")
+      val Array(jar0, cls) = s.split("!")
+      val uri = rawPathToJarUri(jar0)
+      val path = "/" + cls
       (uri, path)
+    }
+
+    private def rawPathToJarUri(jar0: String) = {
+      val jar = if (isWindows) "/" + jar0.replace("\\", "/") else jar0
+      URI.create("jar:file:" + jar)
     }
 
     def existsInJar(s: String): Boolean = {
