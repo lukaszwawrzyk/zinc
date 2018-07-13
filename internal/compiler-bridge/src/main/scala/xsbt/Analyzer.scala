@@ -9,7 +9,7 @@ package xsbt
 
 import java.io.File
 import java.net.URI
-import java.nio.file.{ FileSystem, FileSystemAlreadyExistsException, FileSystems, Files }
+import java.nio.file.{ FileSystems, FileSystem, Files }
 
 import scala.tools.nsc.Phase
 
@@ -109,20 +109,12 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       }
     }
 
-    def withZipFs[A](uri: URI, create: Boolean = false)(action: FileSystem => A): A = {
+    def withZipFs[A](uri: URI)(action: FileSystem => A): A = {
       val env = new java.util.HashMap[String, String]
-      if (create) env.put("create", "true")
       xsbti.ArtifactInfo.SbtOrganization.synchronized {
-        val fs = try {
-          FileSystems.newFileSystem(uri, env)
-        } catch {
-          case _: FileSystemAlreadyExistsException =>
-            FileSystems.getFileSystem(uri)
-        }
+        val fs = FileSystems.newFileSystem(uri, env)
         try action(fs)
-        finally {
-          fs.close()
-        }
+        finally fs.close()
       }
     }
   }
