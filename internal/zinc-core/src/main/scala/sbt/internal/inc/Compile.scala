@@ -52,14 +52,17 @@ object IncrementalCompile {
    * @return A flag of whether or not compilation completed succesfully, and the resulting
    *         dependency analysis object.
    */
-  def apply(
-      sources: Set[File],
-      lookup: Lookup,
-      compile: (Set[File], DependencyChanges, xsbti.AnalysisCallback, XClassFileManager) => Unit,
-      previous0: CompileAnalysis,
-      output: Output,
-      log: Logger,
-      options: IncOptions): (Boolean, Analysis) = {
+  def apply(sources: Set[File],
+            lookup: Lookup,
+            compile: (Set[File],
+                      DependencyChanges,
+                      xsbti.AnalysisCallback,
+                      XClassFileManager,
+                      Seq[File]) => Unit,
+            previous0: CompileAnalysis,
+            output: Output,
+            log: Logger,
+            options: IncOptions): (Boolean, Analysis) = {
     val previous = previous0 match { case a: Analysis => a }
     val current = Stamps.initial(Stamper.forLastModified, Stamper.forHash, Stamper.forLastModified)
     val internalBinaryToSourceClassName = (binaryClassName: String) =>

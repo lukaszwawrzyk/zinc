@@ -31,14 +31,11 @@ final class MixedAnalyzingCompiler(
     val log: Logger
 ) {
 
-  import config._
-  import currentSetup._
-
-  private[this] val absClasspath = classpath.map(_.getAbsoluteFile)
+  private[this] val absClasspath = toAbsolute(config.classpath)
 
   /** Mechanism to work with compiler arguments. */
   private[this] val cArgs =
-    new CompilerArguments(compiler.scalaInstance, compiler.classpathOptions)
+    new CompilerArguments(config.compiler.scalaInstance, config.compiler.classpathOptions)
 
   /**
    * Compiles the given Java/Scala files.
@@ -52,9 +49,10 @@ final class MixedAnalyzingCompiler(
       include: Set[File],
       changes: DependencyChanges,
       callback: XAnalysisCallback,
-      classfileManager: XClassFileManager
+      classfileManager: XClassFileManager,
+      extraClasspath: Seq[File]
   ): Unit = {
-    val outputDirs = outputDirectories(output)
+    val outputDirs = outputDirectories(config.currentSetup.output)
     outputDirs.foreach { d =>
       if (!d.getPath.endsWith(".jar"))
         IO.createDirectory(d)
@@ -63,26 +61,29 @@ final class MixedAnalyzingCompiler(
       }
     }
 
-    val incSrc = sources.filter(include)
+    val incSrc = config.sources.filter(include)
     val (javaSrcs, scalaSrcs) = incSrc.partition(javaOnly)
     logInputs(log, javaSrcs.size, scalaSrcs.size, outputDirs)
 
     /** Compile Scala sources. */
     def compileScala(): Unit =
       if (scalaSrcs.nonEmpty) {
-        val sources = if (order == Mixed) incSrc else scalaSrcs
-        val arguments = cArgs(Nil, absClasspath, None, options.scalacOptions)
+        val sources = if (config.currentSetup.order == Mixed) incSrc else scalaSrcs
+        val arguments = cArgs(Nil,
+                              toAbsolute(extraClasspath) ++ absClasspath,
+                              None,
+                              config.currentSetup.options.scalacOptions)
         timed("Scala compilation", log) {
-          compiler.compile(
+          config.compiler.compile(
             sources.toArray,
             changes,
             arguments.toArray,
-            output,
+            config.currentSetup.output,
             callback,
-            reporter,
+            config.reporter,
             config.cache,
             log,
-            progress.toOptional
+            config.progress.toOptional
           )
         }
       }
@@ -94,13 +95,17 @@ final class MixedAnalyzingCompiler(
           val incToolOptions =
             IncToolOptions.of(
               Optional.of(classfileManager),
-              incOptions.useCustomizedFileManager()
+              config.incOptions.useCustomizedFileManager()
             )
-          val joptions = options.javacOptions().toArray[String]
-          val outputDir = output match {
+          val joptions = config.currentSetup.options.javacOptions
+          val outputDir = config.currentSetup.output match {
             case s: SingleOutput =>
-              val out = s.getSingleOutput.get.getParent
-              CompileOutput(new File(out))
+              val out = s.getSingleOutput.get
+              if (out.toPath.endsWith(".jar")) {
+                CompileOutput(new File(out.getParent))
+              } else {
+                CompileOutput(out)
+              }
             case a => a
           }
           javac.compile(
@@ -109,9 +114,9 @@ final class MixedAnalyzingCompiler(
             outputDir,
             callback,
             incToolOptions,
-            reporter,
+            config.reporter,
             log,
-            progress
+            config.progress
           )
         }
       }
@@ -119,7 +124,7 @@ final class MixedAnalyzingCompiler(
 
     /* `Mixed` order defaults to `ScalaThenJava` behaviour.
      * See https://github.com/sbt/zinc/issues/234. */
-    if (order == JavaThenScala) {
+    if (config.currentSetup.order == JavaThenScala) {
       compileJava(); compileScala()
     } else {
       compileScala(); compileJava()
@@ -127,6 +132,10 @@ final class MixedAnalyzingCompiler(
 
     if (javaSrcs.size + scalaSrcs.size > 0)
       log.info("Done compiling.")
+  }
+
+  private def toAbsolute(extraClasspath: Seq[File]) = {
+    extraClasspath.map(_.getAbsoluteFile)
   }
 
   private[this] def outputDirectories(output: Output): Seq[File] = {
@@ -268,7 +277,7 @@ object MixedAnalyzingCompiler {
   ): (Seq[File], String => Option[File]) = {
     import config._
     import currentSetup._
-    val absClasspath = classpath.map(_.getAbsoluteFile)
+    val absClasspath = config.classpath.map(_.getAbsoluteFile)
     val cArgs =
       new CompilerArguments(compiler.scalaInstance, compiler.classpathOptions)
     val searchClasspath = explicitBootClasspath(options.scalacOptions) ++ withBootclasspath(

@@ -11,21 +11,22 @@ package inc
 
 import java.io.File
 import java.nio.file.{ Files, StandardOpenOption }
+import java.util.UUID
 
 import sbt.io.IO
 import xsbti.api.AnalyzedClass
 import xsbti.compile.{
-  DependencyChanges,
-  CompileAnalysis,
   Changes,
-  Output,
+  CompileAnalysis,
+  DependencyChanges,
   IncOptions,
+  Output,
   ClassFileManager => XClassFileManager
 }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 
 import scala.annotation.tailrec
-import scala.util.Random
+import scala.util.{ Random, Try }
 
 private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options: IncOptions) {
 
@@ -47,7 +48,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                            binaryChanges: DependencyChanges,
                            lookup: ExternalLookup,
                            previous: Analysis,
-                           doCompile: (Set[File], DependencyChanges) => Analysis,
+                           doCompile: (Set[File], DependencyChanges, Seq[File]) => Analysis,
                            output: Output,
                            classfileManager: XClassFileManager,
                            cycleNum: Int): Analysis =
@@ -111,14 +112,15 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
       }
     }
 
-  private[this] def recompileClasses(classes: Set[String],
-                                     modifiedSrcs: Set[File],
-                                     allSources: Set[File],
-                                     binaryChanges: DependencyChanges,
-                                     previous: Analysis,
-                                     doCompile: (Set[File], DependencyChanges) => Analysis,
-                                     output: Output,
-                                     classfileManager: XClassFileManager): (Analysis, Set[File]) = {
+  private[this] def recompileClasses(
+      classes: Set[String],
+      modifiedSrcs: Set[File],
+      allSources: Set[File],
+      binaryChanges: DependencyChanges,
+      previous: Analysis,
+      doCompile: (Set[File], DependencyChanges, Seq[File]) => Analysis,
+      output: Output,
+      classfileManager: XClassFileManager): (Analysis, Set[File]) = {
     val invalidatedSources = classes.flatMap(previous.relations.definesClass) ++ modifiedSrcs
     val invalidatedSourcesForCompilation = expand(invalidatedSources, allSources)
     pause("Before prune")
@@ -127,7 +129,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     debugInnerSection("Pruned")(pruned.relations)
 
     val fresh = withPreviousJar(output) {
-      doCompile(invalidatedSourcesForCompilation, binaryChanges)
+      doCompile(invalidatedSourcesForCompilation, binaryChanges, _)
     }
 
     // For javac as class files are added to classfileManager as they are generated, so
@@ -144,9 +146,17 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     (merged, invalidatedSourcesForCompilation)
   }
 
-  private def withPreviousJar[A](output: Output)(action: => A): A = {
+  private def withPreviousJar[A](output: Output)(action: Seq[File] => A): A = {
     val outputJar = output.getSingleOutput.get
-    val prevJar = new File(outputJar.toString.replace(".jar", s"_${Random.nextInt(31) + 1}.jar"))
+
+    // cleanup stuff from other compilations
+    Option(outputJar.toPath.getParent.toFile.listFiles()).foreach { files =>
+      files
+        .filter(f => f.getName.endsWith(".jar") && f.getName.startsWith("tmpjar"))
+        .foreach(f => Try(f.delete()))
+    }
+
+    val prevJar = outputJar.toPath.resolveSibling("tmpjar" + UUID.randomUUID() + ".jar").toFile
     if (outputJar.exists()) {
       pause(s"Prev jar set as $prevJar output jar exists so moving it ")
       IO.move(outputJar, prevJar)
@@ -154,7 +164,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     }
 
     pause("About to run compilation")
-    val res = try action
+    val res = try action(Seq(prevJar))
     catch {
       case e: Exception =>
         pause("Compilation failed")
