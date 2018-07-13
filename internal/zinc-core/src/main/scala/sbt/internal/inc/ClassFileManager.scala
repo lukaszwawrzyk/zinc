@@ -184,7 +184,7 @@ object ClassFileManager {
             val tmpSrc = tmpJar.toPath.resolveSibling("~~tmp~cfm~merge~~.jar").toFile
             Files.copy(srcJar.toPath, tmpSrc.toPath)
             STJUtil.mergeJars(into = tmpSrc, from = tmpJar)
-            Files.move(tmpSrc.toPath, srcJar.toPath)
+            Files.move(tmpSrc.toPath, srcJar.toPath, StandardCopyOption.REPLACE_EXISTING)
         }
       }
       logger.debug(s"Removing the temporary directory used for backing up class files: $tempDir")
