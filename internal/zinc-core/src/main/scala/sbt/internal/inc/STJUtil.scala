@@ -14,7 +14,7 @@ object STJUtil {
   def withZipFs[A](uri: URI, create: Boolean = false)(action: FileSystem => A): A = {
     val env = new java.util.HashMap[String, String]
     if (create) env.put("create", "true")
-    xsbti.ArtifactInfo.SbtOrganization.synchronized {
+    synchronized {
       val fs = FileSystems.newFileSystem(uri, env)
       try action(fs)
       finally {

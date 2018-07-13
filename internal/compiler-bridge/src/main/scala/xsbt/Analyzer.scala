@@ -9,7 +9,9 @@ package xsbt
 
 import java.io.File
 import java.net.URI
-import java.nio.file.{ FileSystems, FileSystem, Files }
+import java.nio.file.{ FileSystem, FileSystems, Files }
+import java.util.jar.JarFile
+import java.util.zip.ZipFile
 
 import scala.tools.nsc.Phase
 
@@ -86,36 +88,19 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
   }
 
   private object STJUtil {
-    def isWindows = System.getProperty("os.name").toLowerCase.contains("win")
-
     def init(jar: File, cls: String): String = jar + "!" + cls.replace("\\", "/")
 
-    def toJarUriAndFile(s: String): (URI, String) = {
-      val Array(jar0, cls) = s.split("!")
-      val uri = rawPathToJarUri(jar0)
-      val path = "/" + cls
-      (uri, path)
-    }
-
-    private def rawPathToJarUri(jar0: String) = {
-      val jar = if (isWindows) "/" + jar0.replace("\\", "/") else jar0
-      URI.create("jar:file:" + jar)
+    def toJarAndFile(s: String): (File, String) = {
+      val Array(jar, file) = s.split("!")
+      (new File(jar), file)
     }
 
     def existsInJar(s: String): Boolean = {
-      val (uri, cls) = toJarUriAndFile(s)
-      withZipFs(uri) { fs: FileSystem =>
-        Files.exists(fs.getPath(cls))
-      }
-    }
-
-    def withZipFs[A](uri: URI)(action: FileSystem => A): A = {
-      val env = new java.util.HashMap[String, String]
-      xsbti.ArtifactInfo.SbtOrganization.synchronized {
-        val fs = FileSystems.newFileSystem(uri, env)
-        try action(fs)
-        finally fs.close()
-      }
+      val (jar, cls) = toJarAndFile(s)
+      val file = new ZipFile(jar, ZipFile.OPEN_READ)
+      val exists = file.getEntry(cls) != null
+      file.close()
+      exists
     }
   }
 
