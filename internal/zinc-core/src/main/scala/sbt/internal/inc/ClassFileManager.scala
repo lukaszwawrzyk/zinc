@@ -199,16 +199,16 @@ object ClassFileManager {
   }
 
   private def removeFromJar(jar: URI, classes: Iterable[String]): Unit = {
-    try {
-      STJUtil.withZipFs(jar) { fs =>
+    val origFile = STJUtil.jarUriToFile(jar)
+    if (origFile.exists()) {
+      val tmpFile = origFile.toPath.resolveSibling("~~removing~tmp~~.jar").toFile
+      Files.copy(origFile.toPath, tmpFile.toPath)
+      STJUtil.withZipFs(STJUtil.fileToJarUri(tmpFile)) { fs =>
         classes.foreach { cls =>
           Files.delete(fs.getPath(cls))
         }
       }
-    } catch {
-      case _: FileSystemNotFoundException =>
-      // file does not exist due to compilation error
-      // if it would be created we would need to remove all entries anyway.
+      Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
   }
 
