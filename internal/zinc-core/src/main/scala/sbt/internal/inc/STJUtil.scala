@@ -4,6 +4,7 @@ import java.io.File
 import java.net.URI
 import java.nio.file._
 import java.util.function.Consumer
+import java.util.zip.ZipFile
 
 import sbt.io.IO
 
@@ -147,14 +148,26 @@ object STJUtil {
   }
 
   private def readModifiedTimeFromJar(s: String): Long = {
-    try {
-      val (uri, file) = toJarUriAndFile(s)
-      withZipFs(uri) { fs =>
-        Files.getLastModifiedTime(fs.getPath(file)).toMillis
-      }
-    } catch {
-      case _: FileSystemNotFoundException => 0
-    }
+    val (jar, cls) = toJarAndFile(s)
+    if (jar.exists()) {
+      val file = new ZipFile(jar, ZipFile.OPEN_READ)
+      val time = Option(file.getEntry(cls)).map(_.getLastModifiedTime.toMillis).getOrElse(0L)
+      file.close()
+      time
+    } else 0
+  }
+
+  def toJarAndFile(s: String): (File, String) = {
+    val Array(jar, file) = s.split("!")
+    (new File(jar), file)
+  }
+
+  def existsInJar(s: String): Boolean = {
+    val (jar, cls) = toJarAndFile(s)
+    val file = new ZipFile(jar, ZipFile.OPEN_READ)
+    val exists = file.getEntry(cls) != null
+    file.close()
+    exists
   }
 
 }
