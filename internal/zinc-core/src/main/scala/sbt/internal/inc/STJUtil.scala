@@ -98,18 +98,6 @@ object STJUtil {
     (uri, path)
   }
 
-  def existsInJar(s: String): Boolean = {
-    val (uri, cls) = toJarUriAndFile(s)
-    try {
-      STJUtil.withZipFs(uri) { fs: FileSystem =>
-        Files.exists(fs.getPath(cls))
-      }
-    } catch {
-      case _: FileSystemNotFoundException =>
-        false
-    }
-  }
-
   def rawIdToJarFile(s: String): File = {
     val Array(jar, _) = s.toString.split("!")
     new File(jar)
@@ -164,10 +152,14 @@ object STJUtil {
 
   def existsInJar(s: String): Boolean = {
     val (jar, cls) = toJarAndFile(s)
-    val file = new ZipFile(jar, ZipFile.OPEN_READ)
-    val exists = file.getEntry(cls) != null
-    file.close()
-    exists
+    if (!jar.exists()) {
+      false
+    } else {
+      val file = new ZipFile(jar, ZipFile.OPEN_READ)
+      val exists = file.getEntry(cls) != null
+      file.close()
+      exists
+    }
   }
 
 }
