@@ -59,8 +59,8 @@ object STJUtil {
   }
 
   def pause(s: String): Unit = {
-//    scala.io.StdIn.readLine(s)
-    println(s)
+    scala.io.StdIn.readLine(s)
+//    println(s)
   }
 
   // only for debugging

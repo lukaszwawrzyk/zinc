@@ -48,7 +48,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                            binaryChanges: DependencyChanges,
                            lookup: ExternalLookup,
                            previous: Analysis,
-                           doCompile: (Set[File], DependencyChanges, Seq[File]) => Analysis,
+                           doCompile: (Set[File], DependencyChanges, Seq[File], File) => Analysis,
                            output: Output,
                            classfileManager: XClassFileManager,
                            cycleNum: Int): Analysis =
@@ -118,7 +118,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
       allSources: Set[File],
       binaryChanges: DependencyChanges,
       previous: Analysis,
-      doCompile: (Set[File], DependencyChanges, Seq[File]) => Analysis,
+      doCompile: (Set[File], DependencyChanges, Seq[File], File) => Analysis,
       output: Output,
       classfileManager: XClassFileManager): (Analysis, Set[File]) = {
     val invalidatedSources = classes.flatMap(previous.relations.definesClass) ++ modifiedSrcs
@@ -129,7 +129,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     debugInnerSection("Pruned")(pruned.relations)
 
     val fresh = withPreviousJar(output) {
-      doCompile(invalidatedSourcesForCompilation, binaryChanges, _)
+      doCompile(invalidatedSourcesForCompilation, binaryChanges, _, _)
     }
 
     // For javac as class files are added to classfileManager as they are generated, so
@@ -146,30 +146,33 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     (merged, invalidatedSourcesForCompilation)
   }
 
-  private def withPreviousJar[A](output: Output)(action: Seq[File] => A): A = {
+  private def withPreviousJar[A](output: Output)(action: (Seq[File], File) => A): A = {
     val outputJar = output.getSingleOutput.get
 
     // cleanup stuff from other compilations
+    pause("Trying to get rid of tmpjars")
     Option(outputJar.toPath.getParent.toFile.listFiles()).foreach { files =>
       files
         .filter(f => f.getName.endsWith(".jar") && f.getName.startsWith("tmpjar"))
         .foreach(f => Try(f.delete()))
     }
 
-    val prevJar = outputJar.toPath.resolveSibling("tmpjar" + UUID.randomUUID() + ".jar").toFile
+    val prevJar = outputJar.toPath.resolveSibling("tmpjarprev" + UUID.randomUUID() + ".jar").toFile
     if (outputJar.exists()) {
       pause(s"Prev jar set as $prevJar output jar exists so moving it ")
       IO.move(outputJar, prevJar)
       pause(s"Moved")
     }
 
-    pause("About to run compilation")
-    val res = try action(Seq(prevJar))
+    val jarForStupidScalac =
+      outputJar.toPath.resolveSibling("tmpjarout" + UUID.randomUUID() + ".jar").toFile
+    pause(s"About to run compilation, will enforce $jarForStupidScalac as output")
+    val res = try action(Seq(prevJar), jarForStupidScalac)
     catch {
       case e: Exception =>
         pause("Compilation failed")
         if (prevJar.exists()) {
-          pause("Reverting prev jar")
+          pause(s"Reverting prev jar $prevJar onto $outputJar")
           IO.move(prevJar, outputJar)
           pause("Reverted prev jar")
         }
@@ -177,19 +180,21 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     }
 
     if (prevJar.exists()) {
-      if (outputJar.exists()) {
+      if (jarForStupidScalac.exists()) {
         val tmpTargetJar = prevJar.toPath.resolveSibling("~~merge~target~~.jar")
-        val tmpSrcJar = outputJar.toPath.resolveSibling("~~merge~source~~.jar")
-        pause(s"Prev jar and out jar exist so merging those, will copy $prevJar on $tmpTargetJar")
+        val tmpSrcJar = jarForStupidScalac.toPath.resolveSibling("~~merge~source~~.jar")
+        pause(
+          s"Prev jar and temp out jar exist so merging those, will copy $prevJar on $tmpTargetJar")
         Files.copy(prevJar.toPath, tmpTargetJar)
-        pause(s"Will copy $outputJar on $tmpSrcJar")
-        Files.copy(outputJar.toPath, tmpSrcJar)
+        pause(s"Will copy $jarForStupidScalac on $tmpSrcJar")
+        Files.copy(jarForStupidScalac.toPath, tmpSrcJar)
         pause(s"Prev jar and out jar exist so merging those $tmpTargetJar and $tmpSrcJar")
         STJUtil.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
-
-        pause("merged, moving prevJar on outJar")
+        pause(s"merged, moving prevJar on outJar $tmpTargetJar to $outputJar")
         IO.move(tmpTargetJar.toFile, outputJar)
-        pause("moved")
+        pause(s"moved, trying to remove $jarForStupidScalac")
+        Try(Files.delete(jarForStupidScalac.toPath)) // probably will fail anyway
+        pause("Finally done")
       } else {
         pause("java path")
         // Java only compilation case - probably temporary as java should go to jar as well

@@ -50,14 +50,15 @@ final class MixedAnalyzingCompiler(
       changes: DependencyChanges,
       callback: XAnalysisCallback,
       classfileManager: XClassFileManager,
-      extraClasspath: Seq[File]
+      extraClasspath: Seq[File],
+      outputOverride: File
   ): Unit = {
     val outputDirs = outputDirectories(config.currentSetup.output)
     outputDirs.foreach { d =>
-      if (!d.getPath.endsWith(".jar"))
-        IO.createDirectory(d)
-      else {
+      if (d.getPath.endsWith(".jar"))
         IO.createDirectory(d.getParentFile)
+      else {
+        IO.createDirectory(d)
       }
     }
 
@@ -78,7 +79,7 @@ final class MixedAnalyzingCompiler(
             sources.toArray,
             changes,
             arguments.toArray,
-            config.currentSetup.output,
+            CompileOutput(outputOverride),
             callback,
             config.reporter,
             config.cache,

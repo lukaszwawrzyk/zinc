@@ -62,7 +62,8 @@ object Incremental {
                 DependencyChanges,
                 xsbti.AnalysisCallback,
                 XClassFileManager,
-                Seq[File]) => Unit,
+                Seq[File],
+                File) => Unit,
       output: Output,
       callbackBuilder: AnalysisCallback.Builder,
       log: sbt.util.Logger,
@@ -115,15 +116,19 @@ object Incremental {
                 DependencyChanges,
                 xsbti.AnalysisCallback,
                 XClassFileManager,
-                Seq[File]) => Unit,
+                Seq[File],
+                File) => Unit,
       callbackBuilder: AnalysisCallback.Builder,
       classFileManager: XClassFileManager
-  )(srcs: Set[File], changes: DependencyChanges, extraClasspath: Seq[File]): Analysis = {
+  )(srcs: Set[File],
+    changes: DependencyChanges,
+    extraClasspath: Seq[File],
+    outputOverride: File): Analysis = {
     // Note `ClassFileManager` is shared among multiple cycles in the same incremental compile run,
     // in order to rollback entirely if transaction fails. `AnalysisCallback` is used by each cycle
     // to report its own analysis individually.
     val callback = callbackBuilder.build()
-    compile(srcs, changes, callback, classFileManager, extraClasspath)
+    compile(srcs, changes, callback, classFileManager, extraClasspath, outputOverride)
     callback.get
   }
 
