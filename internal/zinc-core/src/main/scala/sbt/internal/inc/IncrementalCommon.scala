@@ -178,14 +178,17 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
 
     if (prevJar.exists()) {
       if (outputJar.exists()) {
-        val tmpJar = prevJar.toPath.resolveSibling("~~output~~.jar")
-        pause(s"Prev jar and out jar exist so merging those, will copy $prevJar on $tmpJar")
-        Files.copy(prevJar.toPath, tmpJar)
-        pause(s"Prev jar and out jar exist so merging those $tmpJar and $outputJar")
-        STJUtil.mergeJars(into = tmpJar.toFile, from = outputJar)
+        val tmpTargetJar = prevJar.toPath.resolveSibling("~~merge~target~~.jar")
+        val tmpSrcJar = outputJar.toPath.resolveSibling("~~merge~source~~.jar")
+        pause(s"Prev jar and out jar exist so merging those, will copy $prevJar on $tmpTargetJar")
+        Files.copy(prevJar.toPath, tmpTargetJar)
+        pause(s"Will copy $outputJar on $tmpSrcJar")
+        Files.copy(outputJar.toPath, tmpSrcJar)
+        pause(s"Prev jar and out jar exist so merging those $tmpTargetJar and $tmpSrcJar")
+        STJUtil.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
 
         pause("merged, moving prevJar on outJar")
-        IO.move(tmpJar.toFile, outputJar)
+        IO.move(tmpTargetJar.toFile, outputJar)
         pause("moved")
       } else {
         pause("java path")
