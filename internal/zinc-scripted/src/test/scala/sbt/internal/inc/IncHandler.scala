@@ -354,7 +354,7 @@ case class ProjectStructure(
 
   def checkNoGeneratedClassFiles(): Unit = {
     val allClassFiles = generatedClassFiles.get
-    val allJaredClassFiles = STJUtil.listFiles(outputJar).filter(_.endsWith(".class"))
+    val allJaredClassFiles = Seq.empty // STJUtil.listFiles(outputJar).filter(_.endsWith(".class"))
     if (allClassFiles.nonEmpty || allJaredClassFiles.nonEmpty)
       sys.error(
         s"Classes existed:\n\t${allClassFiles.mkString("\n\t")} \n\t${allJaredClassFiles.mkString("\n\t")}")

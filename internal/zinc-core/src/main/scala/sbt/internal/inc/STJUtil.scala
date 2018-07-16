@@ -144,13 +144,7 @@ object STJUtil {
   private def readModifiedTimeFromJar(s: String): Long = {
     val (jar, cls) = toJarAndFile(s)
     if (jar.exists()) {
-      if (jar.getName.endsWith("output.jar")) {
-        throw new NotImplementedError(s"reading stamp from output jar $jar")
-      } else {
-        println("#################################################################")
-        println(s"#################### Reading stamp from $jar ###################")
-        println("#################################################################")
-      }
+      // OPENS OUTPUT.JAR !!! (when collecting initial stamps)
       val file = new ZipFile(jar, ZipFile.OPEN_READ)
       val time = Option(file.getEntry(cls)).map(_.getLastModifiedTime.toMillis).getOrElse(0L)
       file.close()
@@ -196,6 +190,7 @@ object STJUtil {
     val prevJar = outputJar.toPath.resolveSibling("tmpjarprev" + UUID.randomUUID() + ".jar").toFile
     if (outputJar.exists()) {
       pause(s"Prev jar set as $prevJar output jar ($outputJar) exists so moving it ")
+      // MOVES OUTPUT.JAR !!!
       IO.move(outputJar, prevJar)
       pause(s"Moved")
     }
@@ -210,6 +205,7 @@ object STJUtil {
         pause("Compilation failed")
         if (prevJar.exists()) {
           pause(s"Reverting prev jar $prevJar onto $outputJar")
+          // MOVES TO OUTPUT.JAR !!!
           IO.move(prevJar, outputJar)
           pause("Reverted prev jar")
         }
@@ -229,6 +225,7 @@ object STJUtil {
         pause(s"Prev jar and out jar exist so merging those $tmpTargetJar and $tmpSrcJar")
         STJUtil.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
         pause(s"merged, moving prevJar on outJar $tmpTargetJar to $outputJar")
+        // MOVES TO OUTPUT.JAR !!!
         IO.move(tmpTargetJar.toFile, outputJar)
         pause(s"moved, trying to remove $jarForStupidScalac")
         Try(Files.delete(jarForStupidScalac.toPath)) // probably will fail anyway
@@ -236,12 +233,14 @@ object STJUtil {
       } else {
         // Java only compilation case - probably temporary as java should go to jar as well
         pause("java path")
+        // MOVES TO OUTPUT.JAR !!!
         IO.move(prevJar, outputJar)
       }
     } else {
       if (jarForStupidScalac.exists()) {
         // prev jar does not exist so it is the first compilation for scalac, just copy temp jar to output
         pause(s"Copying $jarForStupidScalac to $outputJar")
+        // COPIES ONTO OUTPUT.JAR !!!
         Files.copy(jarForStupidScalac.toPath,
                    outputJar.toPath,
                    StandardCopyOption.COPY_ATTRIBUTES,
