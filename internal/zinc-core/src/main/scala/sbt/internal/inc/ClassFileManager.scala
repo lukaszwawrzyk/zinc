@@ -101,6 +101,7 @@ object ClassFileManager {
       show(s"About to delete class files:\n${showFiles(classes)}")
       val (jared, regular) = splitToClassesAndJars(classes)
 
+      // old logic for regular class files
       locally {
         val toBeBackedUp =
           regular.filter(c => c.exists && !movedClasses.contains(c) && !generatedClasses(c))
@@ -111,6 +112,7 @@ object ClassFileManager {
         IO.deleteFilesEmptyDirs(regular)
       }
 
+      // logic for jared classes
       locally {
         val toBeBackedUp =
           jared.filter(

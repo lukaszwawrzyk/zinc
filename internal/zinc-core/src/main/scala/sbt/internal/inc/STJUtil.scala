@@ -32,7 +32,8 @@ object STJUtil {
     catch {
       case _: FileSystemException =>
         Thread.sleep(200)
-        println(s"~@@@@@@@@~ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RETRY IN PLACE ${Random.nextInt}")
+        println(
+          s"~@@@@@@@@~ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RETRY IN PLACE ${Random.nextInt}")
         retry(f)
     }
   }
@@ -135,14 +136,21 @@ object STJUtil {
 
   def isJar(file: File): Boolean = {
     file.getPath.split("!") match {
-      case Array(jar, cls) if jar.endsWith(".jar") => true
-      case _                                       => false
+      case Array(jar, cls) => jar.endsWith(".jar")
+      case _               => false
     }
   }
 
   private def readModifiedTimeFromJar(s: String): Long = {
     val (jar, cls) = toJarAndFile(s)
     if (jar.exists()) {
+      if (jar.getName.endsWith("output.jar")) {
+        throw new NotImplementedError(s"reading stamp from output jar $jar")
+      } else {
+        println("#################################################################")
+        println(s"#################### Reading stamp from $jar ###################")
+        println("#################################################################")
+      }
       val file = new ZipFile(jar, ZipFile.OPEN_READ)
       val time = Option(file.getEntry(cls)).map(_.getLastModifiedTime.toMillis).getOrElse(0L)
       file.close()
@@ -232,9 +240,8 @@ object STJUtil {
       }
     } else {
       if (jarForStupidScalac.exists()) {
-        // prev jar does not exist so it is the first compilation for scalac, just rename temp jar to output
+        // prev jar does not exist so it is the first compilation for scalac, just copy temp jar to output
         pause(s"Copying $jarForStupidScalac to $outputJar")
-        // copy is safer, will see
         Files.copy(jarForStupidScalac.toPath,
                    outputJar.toPath,
                    StandardCopyOption.COPY_ATTRIBUTES,
@@ -257,7 +264,7 @@ object STJUtil {
           Files.delete(fs.getPath(cls))
         }
       }
-      retry(Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING))
+      Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
   }
 

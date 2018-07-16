@@ -11,11 +11,12 @@ package inc
 package classfile
 
 import scala.collection.mutable
-import mutable.{ Buffer, ArrayBuffer }
+import mutable.{ ArrayBuffer, Buffer }
 import scala.annotation.tailrec
 import java.io.File
 import java.net.URL
 
+import sbt.io.IO
 import xsbti.api.DependencyContext
 import xsbti.api.DependencyContext._
 import sbt.io.IO.{ FileScheme, toFile }
@@ -178,6 +179,7 @@ private[sbt] object Analyze {
         None
     }
 
+  // TODO this is probably problematic (it uses original scheme instead of STJUtil one)? Better analyze it later.
   // copied and edited from IO
   private def urlAsFile0(url: URL): Option[File] =
     url.getProtocol match {
