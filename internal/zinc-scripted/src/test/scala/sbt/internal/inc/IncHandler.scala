@@ -354,6 +354,7 @@ case class ProjectStructure(
 
   def checkNoGeneratedClassFiles(): Unit = {
     val allClassFiles = generatedClassFiles.get
+    // OPENS OUTPUT.JAR !!! (commented out for safety, it will make some tests fail, but will make sure that it does not cause problems).
     val allJaredClassFiles = Seq.empty // STJUtil.listFiles(outputJar).filter(_.endsWith(".class"))
     if (allClassFiles.nonEmpty || allJaredClassFiles.nonEmpty)
       sys.error(

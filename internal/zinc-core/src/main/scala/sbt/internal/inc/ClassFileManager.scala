@@ -51,6 +51,7 @@ object ClassFileManager {
       IO.deleteFilesEmptyDirs(regular)
       groupByJars(jared).foreach {
         case (jar, classes) =>
+          // _PROBABLY_ DOES NOT TOUCH OUTPUT.JAR !!!
           STJUtil.removeFromJar(jar, classes)
       }
 
@@ -117,6 +118,7 @@ object ClassFileManager {
         val toBeBackedUp =
           jared.filter(
             c =>
+              // OPENS OUTPUT.JAR !!!
               STJUtil.existsInJar(c.toString) && !movedJaredClasses.contains(c) && !generatedClasses
                 .contains(c))
         show(s"We backup jared class files:\n${showFiles(toBeBackedUp)}")
@@ -130,6 +132,7 @@ object ClassFileManager {
             for (c <- classes) {
               movedJaredClasses.put(new File(STJUtil.fromJarUriAndFile(jar, c)), targetJar)
 
+              // OPENS OUTPUT.JAR !!! (one of those calls, analyze further, probably `jar`)
               STJUtil.withZipFs(jar) { srcFs =>
                 STJUtil.withZipFs(targetJar, create = true) { dstFs =>
                   val src = srcFs.getPath(c)
@@ -143,6 +146,7 @@ object ClassFileManager {
             }
             // maybe "move" should be handled as I am copying but probably handled by next line
             show(s"Removing ${classes.toList.mkString("\n")} from $jar")
+            // OPENS OUTPUT.JAR !!!
             STJUtil.removeFromJar(jar, classes)
         }
       }
@@ -166,6 +170,7 @@ object ClassFileManager {
           val (jared, regular) = splitToClassesAndJars(generatedClasses)
           IO.deleteFilesEmptyDirs(regular)
           groupByJars(jared).foreach {
+            // OPENS OUTPUT.JAR !!!
             case (jar, classes) => STJUtil.removeFromJar(jar, classes)
           }
         }
@@ -186,6 +191,7 @@ object ClassFileManager {
             val tmpSrc = tmpJar.toPath.resolveSibling("~~tmp~cfm~merge~~.jar").toFile
             Files.copy(srcJar.toPath, tmpSrc.toPath)
             STJUtil.mergeJars(into = tmpSrc, from = tmpJar)
+            // MOVES ON OUTPUT.JAR !!!
             Files.move(tmpSrc.toPath, srcJar.toPath, StandardCopyOption.REPLACE_EXISTING)
         }
       }
