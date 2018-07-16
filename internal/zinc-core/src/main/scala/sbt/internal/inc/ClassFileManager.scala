@@ -13,14 +13,14 @@ import sbt.io.IO
 import java.io.File
 import java.net.URI
 import java.nio.file._
-import java.util.{ UUID, Optional }
+import java.util.{ Optional, UUID }
 
 import collection.mutable
 import xsbti.compile.{
-  IncOptions,
-  DeleteImmediatelyManagerType,
-  TransactionalManagerType,
   ClassFileManagerType,
+  DeleteImmediatelyManagerType,
+  IncOptions,
+  TransactionalManagerType,
   ClassFileManager => XClassFileManager
 }
 
@@ -51,7 +51,7 @@ object ClassFileManager {
       IO.deleteFilesEmptyDirs(regular)
       groupByJars(jared).foreach {
         case (jar, classes) =>
-          removeFromJar(jar, classes)
+          STJUtil.removeFromJar(jar, classes)
       }
 
     }
@@ -141,7 +141,7 @@ object ClassFileManager {
             }
             // maybe "move" should be handled as I am copying but probably handled by next line
             show(s"Removing ${classes.toList.mkString("\n")} from $jar")
-            removeFromJar(jar, classes)
+            STJUtil.removeFromJar(jar, classes)
         }
       }
     }
@@ -164,7 +164,7 @@ object ClassFileManager {
           val (jared, regular) = splitToClassesAndJars(generatedClasses)
           IO.deleteFilesEmptyDirs(regular)
           groupByJars(jared).foreach {
-            case (jar, classes) => removeFromJar(jar, classes)
+            case (jar, classes) => STJUtil.removeFromJar(jar, classes)
           }
         }
 
@@ -195,20 +195,6 @@ object ClassFileManager {
       val target = File.createTempFile("sbt", ".class", tempDir)
       IO.move(c, target)
       target
-    }
-  }
-
-  private def removeFromJar(jar: URI, classes: Iterable[String]): Unit = {
-    val origFile = STJUtil.jarUriToFile(jar)
-    if (origFile.exists()) {
-      val tmpFile = origFile.toPath.resolveSibling("~~removing~tmp~~.jar").toFile
-      Files.copy(origFile.toPath, tmpFile.toPath)
-      STJUtil.withZipFs(STJUtil.fileToJarUri(tmpFile)) { fs =>
-        classes.foreach { cls =>
-          Files.delete(fs.getPath(cls))
-        }
-      }
-      Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
   }
 

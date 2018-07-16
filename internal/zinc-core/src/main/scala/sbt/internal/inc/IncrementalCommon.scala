@@ -128,7 +128,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     pause("After prune")
     debugInnerSection("Pruned")(pruned.relations)
 
-    val fresh = withPreviousJar(output) {
+    val fresh = STJUtil.withPreviousJar(output) {
       doCompile(invalidatedSourcesForCompilation, binaryChanges, _, _)
     }
 
@@ -144,79 +144,6 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
       debugInnerSection("Merged")(merged.relations)
     }
     (merged, invalidatedSourcesForCompilation)
-  }
-
-  private def withPreviousJar[A](output: Output)(action: (Seq[File], File) => A): A = {
-    val outputJar = output.getSingleOutput.get
-
-    // cleanup stuff from other compilations
-    pause("Trying to get rid of tmpjars")
-    Option(outputJar.toPath.getParent.toFile.listFiles()).foreach { files =>
-      files
-        .filter(f => f.getName.endsWith(".jar") && f.getName.startsWith("tmpjar"))
-        .foreach(f => Try(f.delete()))
-    }
-
-    val prevJar = outputJar.toPath.resolveSibling("tmpjarprev" + UUID.randomUUID() + ".jar").toFile
-    if (outputJar.exists()) {
-      pause(s"Prev jar set as $prevJar output jar ($outputJar) exists so moving it ")
-      IO.move(outputJar, prevJar)
-      pause(s"Moved")
-    }
-    val jarForStupidScalac =
-      outputJar.toPath
-        .resolveSibling("tmpjarout" + UUID.randomUUID() + "_tmpjarsep_" + outputJar.getName)
-        .toFile
-    pause(s"About to run compilation, will enforce $jarForStupidScalac as output")
-    val res = try action(Seq(prevJar), jarForStupidScalac)
-    catch {
-      case e: Exception =>
-        pause("Compilation failed")
-        if (prevJar.exists()) {
-          pause(s"Reverting prev jar $prevJar onto $outputJar")
-          IO.move(prevJar, outputJar)
-          pause("Reverted prev jar")
-        }
-        throw e
-    }
-
-    if (prevJar.exists()) {
-      if (jarForStupidScalac.exists()) {
-        // most complex case: scala compilation completed to a temp jar and prev jars exists, they need to be merged
-        val tmpTargetJar = prevJar.toPath.resolveSibling("~~merge~target~~.jar")
-        val tmpSrcJar = jarForStupidScalac.toPath.resolveSibling("~~merge~source~~.jar")
-        pause(
-          s"Prev jar and temp out jar exist so merging those, will copy $prevJar on $tmpTargetJar")
-        Files.copy(prevJar.toPath, tmpTargetJar)
-        pause(s"Will copy $jarForStupidScalac on $tmpSrcJar")
-        Files.copy(jarForStupidScalac.toPath, tmpSrcJar)
-        pause(s"Prev jar and out jar exist so merging those $tmpTargetJar and $tmpSrcJar")
-        STJUtil.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
-        pause(s"merged, moving prevJar on outJar $tmpTargetJar to $outputJar")
-        IO.move(tmpTargetJar.toFile, outputJar)
-        pause(s"moved, trying to remove $jarForStupidScalac")
-        Try(Files.delete(jarForStupidScalac.toPath)) // probably will fail anyway
-        pause("Finally done")
-      } else {
-        // Java only compilation case - probably temporary as java should go to jar as well
-        pause("java path")
-        IO.move(prevJar, outputJar)
-      }
-    } else {
-      if (jarForStupidScalac.exists()) {
-        // prev jar does not exist so it is the first compilation for scalac, just rename temp jar to output
-        pause(s"Copying $jarForStupidScalac to $outputJar")
-        // copy is safer, will see
-        Files.copy(jarForStupidScalac.toPath,
-                   outputJar.toPath,
-                   StandardCopyOption.COPY_ATTRIBUTES,
-                   StandardCopyOption.REPLACE_EXISTING)
-      } else {
-        // there is no output jar, so it was a java compilation without prev jar, nothing to do
-      }
-    }
-
-    res
   }
 
   private[this] def emptyChanges: DependencyChanges = new DependencyChanges {

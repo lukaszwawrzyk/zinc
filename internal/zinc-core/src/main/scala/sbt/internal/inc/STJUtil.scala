@@ -3,12 +3,16 @@ package sbt.internal.inc
 import java.io.File
 import java.net.URI
 import java.nio.file._
+import java.util.UUID
 import java.util.function.Consumer
 import java.util.zip.ZipFile
 
+import com.sun.jna.platform.win32.Kernel32
 import sbt.io.IO
+import xsbti.compile.Output
 
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 object STJUtil {
 
@@ -24,7 +28,7 @@ object STJUtil {
     }
   }
 
-  def retry[A](f: => A): A = {
+  def retry(f: => Unit): Unit = {
     try f
     catch {
       case _: FileSystemException =>
@@ -59,8 +63,8 @@ object STJUtil {
   }
 
   def pause(s: String): Unit = {
-    scala.io.StdIn.readLine(s)
-//    println(s)
+//    scala.io.StdIn.readLine(s)
+    println(s)
   }
 
   // only for debugging
@@ -78,7 +82,7 @@ object STJUtil {
     } else Nil
   }
 
-  def isWindows = System.getProperty("os.name").toLowerCase.contains("win")
+  def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
   def init(jar: File, cls: String): String = jar + "!" + cls.replace("\\", "/")
 
@@ -159,6 +163,100 @@ object STJUtil {
       val exists = file.getEntry(cls) != null
       file.close()
       exists
+    }
+  }
+
+  // a fake datastruct to avoid altering analysis callback interface
+  def toTmpAndTarget(f: File): (File, File) = {
+    val Array(tmp, target) = f.toString.split("##")
+    (new File(tmp), new File(target))
+  }
+
+  def withPreviousJar[A](output: Output)(
+      compile: ( /*extra cp: */ Seq[File], /*outputOverride: */ File) => A): A = {
+    val outputJar = output.getSingleOutput.get
+
+    // cleanup stuff from other compilations
+    pause("Trying to get rid of tmpjars")
+    Option(outputJar.toPath.getParent.toFile.listFiles()).foreach { files =>
+      files
+        .filter(f => f.getName.endsWith(".jar") && f.getName.startsWith("tmpjar"))
+        .foreach(f => Try(f.delete()))
+    }
+
+    val prevJar = outputJar.toPath.resolveSibling("tmpjarprev" + UUID.randomUUID() + ".jar").toFile
+    if (outputJar.exists()) {
+      pause(s"Prev jar set as $prevJar output jar ($outputJar) exists so moving it ")
+      IO.move(outputJar, prevJar)
+      pause(s"Moved")
+    }
+    val jarForStupidScalac =
+      outputJar.toPath
+        .resolveSibling("tmpjarout" + UUID.randomUUID() + "_tmpjarsep_" + outputJar.getName)
+        .toFile
+    pause(s"About to run compilation, will enforce $jarForStupidScalac as output")
+    val res = try compile(Seq(prevJar), jarForStupidScalac)
+    catch {
+      case e: Exception =>
+        pause("Compilation failed")
+        if (prevJar.exists()) {
+          pause(s"Reverting prev jar $prevJar onto $outputJar")
+          IO.move(prevJar, outputJar)
+          pause("Reverted prev jar")
+        }
+        throw e
+    }
+
+    if (prevJar.exists()) {
+      if (jarForStupidScalac.exists()) {
+        // most complex case: scala compilation completed to a temp jar and prev jars exists, they need to be merged
+        val tmpTargetJar = prevJar.toPath.resolveSibling("~~merge~target~~.jar")
+        val tmpSrcJar = jarForStupidScalac.toPath.resolveSibling("~~merge~source~~.jar")
+        pause(
+          s"Prev jar and temp out jar exist so merging those, will copy $prevJar on $tmpTargetJar")
+        Files.copy(prevJar.toPath, tmpTargetJar)
+        pause(s"Will copy $jarForStupidScalac on $tmpSrcJar")
+        Files.copy(jarForStupidScalac.toPath, tmpSrcJar)
+        pause(s"Prev jar and out jar exist so merging those $tmpTargetJar and $tmpSrcJar")
+        STJUtil.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
+        pause(s"merged, moving prevJar on outJar $tmpTargetJar to $outputJar")
+        IO.move(tmpTargetJar.toFile, outputJar)
+        pause(s"moved, trying to remove $jarForStupidScalac")
+        Try(Files.delete(jarForStupidScalac.toPath)) // probably will fail anyway
+        pause("Finally done")
+      } else {
+        // Java only compilation case - probably temporary as java should go to jar as well
+        pause("java path")
+        IO.move(prevJar, outputJar)
+      }
+    } else {
+      if (jarForStupidScalac.exists()) {
+        // prev jar does not exist so it is the first compilation for scalac, just rename temp jar to output
+        pause(s"Copying $jarForStupidScalac to $outputJar")
+        // copy is safer, will see
+        Files.copy(jarForStupidScalac.toPath,
+                   outputJar.toPath,
+                   StandardCopyOption.COPY_ATTRIBUTES,
+                   StandardCopyOption.REPLACE_EXISTING)
+      } else {
+        // there is no output jar, so it was a java compilation without prev jar, nothing to do
+      }
+    }
+
+    res
+  }
+
+  def removeFromJar(jar: URI, classes: Iterable[String]): Unit = {
+    val origFile = STJUtil.jarUriToFile(jar)
+    if (origFile.exists()) {
+      val tmpFile = origFile.toPath.resolveSibling("~~removing~tmp~~.jar").toFile
+      Files.copy(origFile.toPath, tmpFile.toPath)
+      STJUtil.withZipFs(STJUtil.fileToJarUri(tmpFile)) { fs =>
+        classes.foreach { cls =>
+          Files.delete(fs.getPath(cls))
+        }
+      }
+      Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
   }
 
