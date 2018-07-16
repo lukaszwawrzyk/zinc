@@ -7,12 +7,11 @@ import java.util.UUID
 import java.util.function.Consumer
 import java.util.zip.ZipFile
 
-import com.sun.jna.platform.win32.Kernel32
 import sbt.io.IO
 import xsbti.compile.Output
 
 import scala.collection.mutable.ListBuffer
-import scala.util.Try
+import scala.util.{ Random, Try }
 
 object STJUtil {
 
@@ -32,6 +31,8 @@ object STJUtil {
     try f
     catch {
       case _: FileSystemException =>
+        Thread.sleep(200)
+        println(s"~@@@@@@@@~ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RETRY IN PLACE ${Random.nextInt}")
         retry(f)
     }
   }
@@ -256,7 +257,7 @@ object STJUtil {
           Files.delete(fs.getPath(cls))
         }
       }
-      Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING)
+      retry(Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING))
     }
   }
 
