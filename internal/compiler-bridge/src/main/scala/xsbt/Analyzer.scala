@@ -76,11 +76,16 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
   private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
     outputDirs.flatMap { jarFile =>
       val relativeFile =
-        fileForClass(new java.io.File("."), sym, separatorRequired).toString.drop(2)
+        fileForClass(new java.io.File("."), sym, separatorRequired).toString
+          .drop(2) // stripPrefix ./ or .\
       val uri = STJUtil.init(jarFile, relativeFile)
-      val file = new File(uri)
       if (STJUtil.existsInJar(uri)) {
-        Some(file)
+        // construct the real, final name
+        val dir = jarFile.toPath.getParent
+        val name = jarFile.getName.split("_tmpjarsep_")(1)
+        val finalJarFile = dir.resolve(name)
+        val finalUri = STJUtil.init(finalJarFile.toFile, relativeFile)
+        Some(new File(finalUri))
       } else {
         None
       }

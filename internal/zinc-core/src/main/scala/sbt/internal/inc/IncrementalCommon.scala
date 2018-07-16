@@ -10,7 +10,7 @@ package internal
 package inc
 
 import java.io.File
-import java.nio.file.{ Files, StandardOpenOption }
+import java.nio.file.{ Files, StandardCopyOption, StandardOpenOption }
 import java.util.UUID
 
 import sbt.io.IO
@@ -159,13 +159,14 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
 
     val prevJar = outputJar.toPath.resolveSibling("tmpjarprev" + UUID.randomUUID() + ".jar").toFile
     if (outputJar.exists()) {
-      pause(s"Prev jar set as $prevJar output jar exists so moving it ")
+      pause(s"Prev jar set as $prevJar output jar ($outputJar) exists so moving it ")
       IO.move(outputJar, prevJar)
       pause(s"Moved")
     }
-
     val jarForStupidScalac =
-      outputJar.toPath.resolveSibling("tmpjarout" + UUID.randomUUID() + ".jar").toFile
+      outputJar.toPath
+        .resolveSibling("tmpjarout" + UUID.randomUUID() + "_tmpjarsep_" + outputJar.getName)
+        .toFile
     pause(s"About to run compilation, will enforce $jarForStupidScalac as output")
     val res = try action(Seq(prevJar), jarForStupidScalac)
     catch {
@@ -181,6 +182,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
 
     if (prevJar.exists()) {
       if (jarForStupidScalac.exists()) {
+        // most complex case: scala compilation completed to a temp jar and prev jars exists, they need to be merged
         val tmpTargetJar = prevJar.toPath.resolveSibling("~~merge~target~~.jar")
         val tmpSrcJar = jarForStupidScalac.toPath.resolveSibling("~~merge~source~~.jar")
         pause(
@@ -196,9 +198,21 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
         Try(Files.delete(jarForStupidScalac.toPath)) // probably will fail anyway
         pause("Finally done")
       } else {
-        pause("java path")
         // Java only compilation case - probably temporary as java should go to jar as well
+        pause("java path")
         IO.move(prevJar, outputJar)
+      }
+    } else {
+      if (jarForStupidScalac.exists()) {
+        // prev jar does not exist so it is the first compilation for scalac, just rename temp jar to output
+        pause(s"Copying $jarForStupidScalac to $outputJar")
+        // copy is safer, will see
+        Files.copy(jarForStupidScalac.toPath,
+                   outputJar.toPath,
+                   StandardCopyOption.COPY_ATTRIBUTES,
+                   StandardCopyOption.REPLACE_EXISTING)
+      } else {
+        // there is no output jar, so it was a java compilation without prev jar, nothing to do
       }
     }
 
