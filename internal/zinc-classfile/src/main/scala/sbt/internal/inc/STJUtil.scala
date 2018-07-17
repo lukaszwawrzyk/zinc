@@ -1,17 +1,20 @@
 package sbt.internal.inc
 
-import java.io.File
 import java.net.URI
-import java.nio.file._
-import java.util.UUID
-import java.util.function.Consumer
-import java.util.zip.ZipFile
 
 import sbt.io.IO
-import xsbti.compile.{ Output, SingleOutput }
+import java.util.zip.ZipFile
+import java.io.File
 
 import scala.collection.mutable.ListBuffer
+import java.util.function.Consumer
+import java.nio.file._
+
 import scala.util.{ Random, Try }
+import java.util.UUID
+
+import sbt.io.syntax.URL
+import xsbti.compile.{ Output, SingleOutput }
 
 object STJUtil {
 
@@ -91,6 +94,11 @@ object STJUtil {
   def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
   def init(jar: File, cls: String): String = jar + "!" + cls.replace("\\", "/")
+
+  def fromUrl(u: URL): String = {
+    val Array(jarUri, cls) = u.toString.split("!")
+    fromJarUriAndFile(URI.create(jarUri), cls)
+  }
 
   def fromJarUriAndFile(u: URI, f: String): String = {
     val jar = {

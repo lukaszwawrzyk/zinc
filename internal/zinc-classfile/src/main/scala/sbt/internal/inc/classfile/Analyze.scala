@@ -179,13 +179,12 @@ private[sbt] object Analyze {
         None
     }
 
-  // TODO this is probably problematic (it uses original scheme instead of STJUtil one)? Better analyze it later.
   // copied and edited from IO
   private def urlAsFile0(url: URL): Option[File] =
     url.getProtocol match {
       case FileScheme => Some(toFile(url))
       case "jar" =>
-        Some(new File(url.toString))
+        Some(new File(STJUtil.fromUrl(url)))
       case _ => None
     }
 
