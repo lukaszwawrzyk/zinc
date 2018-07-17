@@ -170,9 +170,13 @@ object STJUtil {
   }
 
   // a fake datastruct to avoid altering analysis callback interface
-  def toTmpAndTarget(f: File): (File, File) = {
-    val Array(tmp, target) = f.toString.split("##")
-    (new File(tmp), new File(target))
+  def toTmpAndTarget(f: File): (Option[File], File) = {
+    f.toString.split("##") match {
+      case Array(tmp, target) =>
+        (Some(new File(tmp)), new File(target))
+      case Array(target) =>
+        (None, new File(target))
+    }
   }
 
   def withPreviousJar[A](output: Output)(
