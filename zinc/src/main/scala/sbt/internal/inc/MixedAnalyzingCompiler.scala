@@ -102,7 +102,7 @@ final class MixedAnalyzingCompiler(
           val outputDir = config.currentSetup.output match {
             case s: SingleOutput =>
               val out = s.getSingleOutput.get
-              if (out.toPath.endsWith(".jar")) {
+              if (out.getName.endsWith(".jar")) {
                 CompileOutput(new File(out.getParent))
               } else {
                 CompileOutput(out)
