@@ -99,15 +99,10 @@ final class MixedAnalyzingCompiler(
               config.incOptions.useCustomizedFileManager()
             )
           val joptions = config.currentSetup.options.javacOptions
-          val outputDir = config.currentSetup.output match {
-            case s: SingleOutput =>
-              val out = s.getSingleOutput.get
-              if (out.getName.endsWith(".jar")) {
-                CompileOutput(new File(out.getParent))
-              } else {
-                CompileOutput(out)
-              }
-            case a => a
+          val outputDir = STJUtil.extractJarOutput(config.currentSetup.output) match {
+            case Some(jarOut) =>
+              CompileOutput(jarOut.getParentFile)
+            case None => config.currentSetup.output
           }
           javac.compile(
             javaSrcs,

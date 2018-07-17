@@ -8,7 +8,7 @@ import java.util.function.Consumer
 import java.util.zip.ZipFile
 
 import sbt.io.IO
-import xsbti.compile.Output
+import xsbti.compile.{ Output, SingleOutput }
 
 import scala.collection.mutable.ListBuffer
 import scala.util.{ Random, Try }
@@ -265,6 +265,18 @@ object STJUtil {
       }
       Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
+  }
+
+  def extractJarOutput(output: Output): Option[File] = {
+    output match {
+      case s: SingleOutput =>
+        val out = s.getSingleOutput.get
+        if (out.getName.endsWith(".jar")) {
+          Some(out)
+        } else None
+      case _ => None
+    }
+
   }
 
 }
