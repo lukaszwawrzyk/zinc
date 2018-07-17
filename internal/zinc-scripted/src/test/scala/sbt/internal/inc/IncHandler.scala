@@ -338,8 +338,9 @@ case class ProjectStructure(
     def products(srcFile: String): Set[String] = {
       val productFiles = analysis.relations.products(baseDirectory / srcFile)
       productFiles.map { file =>
-        if (file.getPath.startsWith("jar:file")) {
-          file.getPath.split("!/")(1)
+        if (STJUtil.isJar(file)) {
+          val (_, cls) = STJUtil.toJarAndFile(file.toString)
+          cls
         } else {
           relativeClassDir(file).getPath
         }
