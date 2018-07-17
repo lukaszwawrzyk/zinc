@@ -24,6 +24,7 @@ import sbt.util.Logger
 import sbt.util.InterfaceUtil.jo2o
 import java.io.File
 import java.net.URL
+import java.nio.file.{ Files, OpenOption, Paths, StandardOpenOption }
 import java.util
 
 import sbt.io.IO
@@ -229,9 +230,17 @@ private final class AnalysisCallback(
             classDependency(dependsOn, fromClassName, context)
           case None =>
             val cleanClassFile =
-              if (!classFile.exists())
-                Try(IO.urlAsFile(new URL(classFile.toString))).toOption.flatten.getOrElse(classFile)
-              else classFile
+              if (classFile.exists()) {
+                classFile
+              } else {
+                if (STJUtil.isJar(classFile)) {
+                  val (jar, _) = STJUtil.toJarAndFile(classFile.toString)
+                  jar
+                } else {
+                  Try(IO.urlAsFile(new URL(classFile.toString))).toOption.flatten
+                    .getOrElse(classFile)
+                }
+              }
             externalDependency(cleanClassFile,
                                onBinaryClassName,
                                fromClassName,
