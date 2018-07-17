@@ -48,8 +48,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                            binaryChanges: DependencyChanges,
                            lookup: ExternalLookup,
                            previous: Analysis,
-                           doCompile: (Set[File], DependencyChanges, Seq[File], File) => Analysis,
-                           output: Output,
+                           doCompile: (Set[File], DependencyChanges) => Analysis,
                            classfileManager: XClassFileManager,
                            cycleNum: Int): Analysis =
     if (invalidatedRaw.isEmpty && modifiedSrcs.isEmpty)
@@ -69,7 +68,6 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                                                            binaryChanges,
                                                            previous,
                                                            doCompile,
-                                                           output,
                                                            classfileManager)
 
       // If we recompiled all sources no need to check what is changed since there is nothing more to recompile
@@ -106,21 +104,18 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
               lookup,
               current,
               doCompile,
-              output,
               classfileManager,
               cycleNum + 1)
       }
     }
 
-  private[this] def recompileClasses(
-      classes: Set[String],
-      modifiedSrcs: Set[File],
-      allSources: Set[File],
-      binaryChanges: DependencyChanges,
-      previous: Analysis,
-      doCompile: (Set[File], DependencyChanges, Seq[File], File) => Analysis,
-      output: Output,
-      classfileManager: XClassFileManager): (Analysis, Set[File]) = {
+  private[this] def recompileClasses(classes: Set[String],
+                                     modifiedSrcs: Set[File],
+                                     allSources: Set[File],
+                                     binaryChanges: DependencyChanges,
+                                     previous: Analysis,
+                                     doCompile: (Set[File], DependencyChanges) => Analysis,
+                                     classfileManager: XClassFileManager): (Analysis, Set[File]) = {
     val invalidatedSources = classes.flatMap(previous.relations.definesClass) ++ modifiedSrcs
     val invalidatedSourcesForCompilation = expand(invalidatedSources, allSources)
     pause("Before prune")
@@ -128,9 +123,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
     pause("After prune")
     debugInnerSection("Pruned")(pruned.relations)
 
-    val fresh = STJUtil.withPreviousJar(output) {
-      doCompile(invalidatedSourcesForCompilation, binaryChanges, _, _)
-    }
+    val fresh = doCompile(invalidatedSourcesForCompilation, binaryChanges)
 
     // For javac as class files are added to classfileManager as they are generated, so
     // this step is redundant. For scalac this is still necessary. TODO: do the same for scalac.

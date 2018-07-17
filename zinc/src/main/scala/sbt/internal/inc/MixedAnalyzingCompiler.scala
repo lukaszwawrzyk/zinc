@@ -49,85 +49,84 @@ final class MixedAnalyzingCompiler(
       include: Set[File],
       changes: DependencyChanges,
       callback: XAnalysisCallback,
-      classfileManager: XClassFileManager,
-      extraClasspath: Seq[File],
-      outputOverride: File
-  ): Unit = {
-    val outputDirs = outputDirectories(config.currentSetup.output)
-    outputDirs.foreach { d =>
-      if (d.getPath.endsWith(".jar"))
-        IO.createDirectory(d.getParentFile)
-      else {
-        IO.createDirectory(d)
-      }
-    }
-
-    val incSrc = config.sources.filter(include)
-    val (javaSrcs, scalaSrcs) = incSrc.partition(javaOnly)
-    logInputs(log, javaSrcs.size, scalaSrcs.size, outputDirs)
-
-    /** Compile Scala sources. */
-    def compileScala(): Unit =
-      if (scalaSrcs.nonEmpty) {
-        val sources = if (config.currentSetup.order == Mixed) incSrc else scalaSrcs
-        val arguments = cArgs(Nil,
-                              toAbsolute(extraClasspath) ++ absClasspath,
-                              None,
-                              config.currentSetup.options.scalacOptions)
-        timed("Scala compilation", log) {
-          config.compiler.compile(
-            sources.toArray,
-            changes,
-            arguments.toArray,
-            CompileOutput(outputOverride),
-            callback,
-            config.reporter,
-            config.cache,
-            log,
-            config.progress.toOptional
-          )
+      classfileManager: XClassFileManager
+  ): Unit = STJUtil.withPreviousJar(config.currentSetup.output) {
+    (extraClasspath, outputOverride) =>
+      val outputDirs = outputDirectories(config.currentSetup.output)
+      outputDirs.foreach { d =>
+        if (d.getName.endsWith(".jar"))
+          IO.createDirectory(d.getParentFile)
+        else {
+          IO.createDirectory(d)
         }
       }
 
-    /** Compile java and run analysis. */
-    def compileJava(): Unit = {
-      if (javaSrcs.nonEmpty) {
-        timed("Java compilation + analysis", log) {
-          val incToolOptions =
-            IncToolOptions.of(
-              Optional.of(classfileManager),
-              config.incOptions.useCustomizedFileManager()
+      val incSrc = config.sources.filter(include)
+      val (javaSrcs, scalaSrcs) = incSrc.partition(javaOnly)
+      logInputs(log, javaSrcs.size, scalaSrcs.size, outputDirs)
+
+      /** Compile Scala sources. */
+      def compileScala(): Unit =
+        if (scalaSrcs.nonEmpty) {
+          val sources = if (config.currentSetup.order == Mixed) incSrc else scalaSrcs
+          val arguments = cArgs(Nil,
+                                toAbsolute(extraClasspath) ++ absClasspath,
+                                None,
+                                config.currentSetup.options.scalacOptions)
+          timed("Scala compilation", log) {
+            config.compiler.compile(
+              sources.toArray,
+              changes,
+              arguments.toArray,
+              CompileOutput(outputOverride),
+              callback,
+              config.reporter,
+              config.cache,
+              log,
+              config.progress.toOptional
             )
-          val joptions = config.currentSetup.options.javacOptions
-          val outputDir = STJUtil.extractJarOutput(config.currentSetup.output) match {
-            case Some(jarOut) =>
-              CompileOutput(jarOut.getParentFile)
-            case None => config.currentSetup.output
           }
-          javac.compile(
-            javaSrcs,
-            joptions,
-            outputDir,
-            callback,
-            incToolOptions,
-            config.reporter,
-            log,
-            config.progress
-          )
+        }
+
+      /** Compile java and run analysis. */
+      def compileJava(): Unit = {
+        if (javaSrcs.nonEmpty) {
+          timed("Java compilation + analysis", log) {
+            val incToolOptions =
+              IncToolOptions.of(
+                Optional.of(classfileManager),
+                config.incOptions.useCustomizedFileManager()
+              )
+            val joptions = config.currentSetup.options.javacOptions
+            val outputDir = STJUtil.extractJarOutput(config.currentSetup.output) match {
+              case Some(jarOut) =>
+                CompileOutput(jarOut.getParentFile)
+              case None => config.currentSetup.output
+            }
+            javac.compile(
+              javaSrcs,
+              joptions,
+              outputDir,
+              callback,
+              incToolOptions,
+              config.reporter,
+              log,
+              config.progress
+            )
+          }
         }
       }
-    }
 
-    /* `Mixed` order defaults to `ScalaThenJava` behaviour.
-     * See https://github.com/sbt/zinc/issues/234. */
-    if (config.currentSetup.order == JavaThenScala) {
-      compileJava(); compileScala()
-    } else {
-      compileScala(); compileJava()
-    }
+      /* `Mixed` order defaults to `ScalaThenJava` behaviour.
+       * See https://github.com/sbt/zinc/issues/234. */
+      if (config.currentSetup.order == JavaThenScala) {
+        compileJava(); compileScala()
+      } else {
+        compileScala(); compileJava()
+      }
 
-    if (javaSrcs.size + scalaSrcs.size > 0)
-      log.info("Done compiling.")
+      if (javaSrcs.size + scalaSrcs.size > 0)
+        log.info("Done compiling.")
   }
 
   private def toAbsolute(extraClasspath: Seq[File]) = {
