@@ -153,8 +153,8 @@ private final class AnalysisCallback(
   private[this] val mainClasses = new HashMap[File, ListBuffer[String]]
   private[this] val binaryDeps = new HashMap[File, Set[File]]
   // source file to set of generated (class file, binary class name); only non local classes are stored here
-  private[this] val nonLocalClasses = new HashMap[File, Set[(File, Option[File], String)]]
-  private[this] val localClasses = new HashMap[File, Set[(File, Option[File])]]
+  private[this] val nonLocalClasses = new HashMap[File, Set[(File, String)]]
+  private[this] val localClasses = new HashMap[File, Set[File]]
   // mapping between src class name and binary (flat) class name for classes generated from src file
   private[this] val classNames = new HashMap[File, Set[(String, String)]]
   // generated class file to its source class name
@@ -259,16 +259,14 @@ private final class AnalysisCallback(
                              classFile: File,
                              binaryClassName: String,
                              srcClassName: String): Unit = {
-    val (tmpClassFile, realClassFile) = STJUtil.toTmpAndTarget(classFile)
-    add(nonLocalClasses, source, (realClassFile, tmpClassFile, binaryClassName))
+    add(nonLocalClasses, source, (classFile, binaryClassName))
     add(classNames, source, (srcClassName, binaryClassName))
-    classToSource.put(realClassFile, srcClassName)
+    classToSource.put(classFile, srcClassName)
     ()
   }
 
   def generatedLocalClass(source: File, classFile: File): Unit = {
-    val (tmpClassFile, realClassFile) = STJUtil.toTmpAndTarget(classFile)
-    add(localClasses, source, (realClassFile, tmpClassFile))
+    add(localClasses, source, classFile)
     ()
   }
 
@@ -361,20 +359,17 @@ private final class AnalysisCallback(
                                         getOrNil(unreporteds, src),
                                         getOrNil(mainClasses, src))
         val binaries = binaryDeps.getOrElse(src, Nil: Iterable[File])
-        val localProds = localClasses.getOrElse(src, Nil: Iterable[(File, Option[File])]) map {
-          case (classFile, tmpClassFile) =>
-            val classFileStamp = stampReader.product(tmpClassFile.getOrElse(classFile))
-            LocalProduct(classFile, classFileStamp)
+        val localProds = localClasses.getOrElse(src, Nil: Iterable[File]) map { classFile =>
+          val classFileStamp = stampReader.product(classFile)
+          LocalProduct(classFile, classFileStamp)
         }
         val binaryToSrcClassName = (classNames.getOrElse(src, Set.empty) map {
           case (srcClassName, binaryClassName) => (binaryClassName, srcClassName)
         }).toMap
-        val nonLocalProds = nonLocalClasses.getOrElse(
-          src,
-          Nil: Iterable[(File, Option[File], String)]) map {
-          case (classFile, tmpClassFile, binaryClassName) =>
+        val nonLocalProds = nonLocalClasses.getOrElse(src, Nil: Iterable[(File, String)]) map {
+          case (classFile, binaryClassName) =>
             val srcClassName = binaryToSrcClassName(binaryClassName)
-            val classFileStamp = stampReader.product(tmpClassFile.getOrElse(classFile))
+            val classFileStamp = stampReader.product(classFile)
             NonLocalProduct(srcClassName, binaryClassName, classFile, classFileStamp)
         }
 

@@ -85,7 +85,7 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         val name = jarFile.getName.split("_tmpjarsep_")(1)
         val finalJarFile = dir.resolve(name)
         val finalUri = STJUtil.init(finalJarFile.toFile, relativeFile)
-        Some(STJUtil.fromTmpAndTarget(new File(uri), new File(finalUri)))
+        Some(new File(finalUri))
       } else {
         None
       }
@@ -106,11 +106,6 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       val exists = file.getEntry(cls) != null
       file.close()
       exists
-    }
-
-    // a fake datastruct to avoid altering analysis callback interface
-    def fromTmpAndTarget(tmp: File, target: File): File = {
-      new File(tmp.toString + "##" + target.toString)
     }
   }
 

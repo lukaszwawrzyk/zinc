@@ -65,8 +65,12 @@ object STJUtil {
   }
 
   def pause(s: String): Unit = {
-//    scala.io.StdIn.readLine(s)
+//    forcePause(s)
     println(s)
+  }
+
+  def forcePause(s: String): Unit = {
+    scala.io.StdIn.readLine(s)
   }
 
   // only for debugging
@@ -166,16 +170,6 @@ object STJUtil {
       val exists = file.getEntry(cls) != null
       file.close()
       exists
-    }
-  }
-
-  // a fake datastruct to avoid altering analysis callback interface
-  def toTmpAndTarget(f: File): (Option[File], File) = {
-    f.toString.split("##") match {
-      case Array(tmp, target) =>
-        (Some(new File(tmp)), new File(target))
-      case Array(target) =>
-        (None, new File(target))
     }
   }
 
