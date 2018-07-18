@@ -129,7 +129,7 @@ final class ScriptedTests(resourceBaseDirectory: File,
           val logFile = createScriptedLogFile(loggerName)
           val logger = rebindLogger(batchLogger, logFile)
 
-          println(s"Running $label")
+          println(s"Running $label in $batchTmpDir")
           // Copy test's contents
           IO.copyDirectory(originalDir, batchTmpDir)
 

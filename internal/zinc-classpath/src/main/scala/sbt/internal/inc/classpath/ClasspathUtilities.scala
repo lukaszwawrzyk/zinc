@@ -73,7 +73,7 @@ object ClasspathUtilities {
     Map(make(AppClassPath, appPaths), make(BootClassPath, bootPaths))
   }
 
-  private[sbt] def filterByClasspath(classpath: Seq[File], loader: ClassLoader): ClassLoader =
+  private[sbt] def filterByClasspath(classpath: Seq[File], loader: ClassLoader): ClasspathFilter =
     new ClasspathFilter(loader, xsbtiLoader, classpath.toSet)
 
   /**
@@ -83,7 +83,7 @@ object ClasspathUtilities {
   def makeLoader(classpath: Seq[File], instance: ScalaInstance): ClassLoader =
     filterByClasspath(classpath, makeLoader(classpath, instance.loaderLibraryOnly, instance))
 
-  def makeLoader(classpath: Seq[File], instance: ScalaInstance, nativeTemp: File): ClassLoader =
+  def makeLoader(classpath: Seq[File], instance: ScalaInstance, nativeTemp: File): ClasspathFilter =
     filterByClasspath(classpath,
                       makeLoader(classpath, instance.loaderLibraryOnly, instance, nativeTemp))
 

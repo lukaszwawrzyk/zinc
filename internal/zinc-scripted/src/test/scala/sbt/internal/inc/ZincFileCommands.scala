@@ -8,6 +8,14 @@ import sbt.internal.scripted.FileCommands
 import sbt.io.IO
 
 class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) {
+  override def apply(command: String, arguments: List[String]): Unit = {
+    println(s">?>?>?> running $command with ${arguments.mkString(" ")}")
+    commands.get(command).map(_(arguments)) match {
+      case Some(_) => ()
+      case None    => scriptError("unknown command " + command); ()
+    }
+  }
+
   override def commandMap: Map[String, List[String] => Unit] = {
     super.commandMap + {
       "pause" noArg {

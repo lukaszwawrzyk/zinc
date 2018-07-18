@@ -44,16 +44,18 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
     val setup = in.setup()
     import config._
     import setup._
+    val output = CompileOutput(classesDirectory)
+    STJUtil.touchOutputFile(output, "befor compilation completely")
     val compilers = in.compilers
     val javacChosen = compilers.javaTools.javac
     val scalac = compilers.scalac
     val extraOptions = extra.toList.map(_.toScalaTuple)
-    compileIncrementally(
+    val res = compileIncrementally(
       scalac,
       javacChosen,
       sources,
       classpath,
-      CompileOutput(classesDirectory),
+      output,
       cache,
       progress().toOption,
       scalacOptions,
@@ -67,6 +69,8 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
       incrementalCompilerOptions,
       extraOptions
     )(logger)
+    STJUtil.touchOutputFile(output, "after compilation completely")
+    res
   }
 
   /**
@@ -176,7 +180,7 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
 
         val msg =
           s"""## Exception when compiling $numberSources to $outputString
-             |${e.getMessage}
+             |${e.toString}
              |${ex.getStackTrace.mkString("\n")}
            """
         logger.error(InterfaceUtil.toSupplier(msg.stripMargin))

@@ -19,7 +19,11 @@ class SleepingHandler(val handler: StatementHandler, delay: Long) extends Statem
 class IncScriptedHandlers(globalCacheDir: File) extends HandlersProvider {
   def getHandlers(config: ScriptConfig): Map[Char, StatementHandler] = Map(
     '$' -> new SleepingHandler(new ZincFileCommands(config.testDirectory()), 500),
-    '#' -> CommentHandler,
+    '#' -> new sbt.internal.scripted.BasicStatementHandler {
+      def apply(command: String, args: List[String]) = {
+        println(s">#>#>#>#>#> Comment $command ${args.mkString(" ")}")
+      }
+    },
     '>' -> {
       val logger: ManagedLogger =
         config.logger() match {

@@ -200,6 +200,7 @@ object STJUtil {
       IO.move(outputJar, prevJar)
       pause(s"Moved")
     }
+
     val jarForStupidScalac =
       outputJar.toPath
         .resolveSibling("tmpjarout" + UUID.randomUUID() + "_tmpjarsep_" + outputJar.getName)
@@ -251,6 +252,7 @@ object STJUtil {
                    outputJar.toPath,
                    StandardCopyOption.COPY_ATTRIBUTES,
                    StandardCopyOption.REPLACE_EXISTING)
+        STJUtil.touchOutputFile(output, "After creating output jar")
       } else {
         // there is no output jar, so it was a java compilation without prev jar, nothing to do
       }
@@ -283,6 +285,39 @@ object STJUtil {
       case _ => None
     }
 
+  }
+
+  def touchOutputFile(output: File, msg: String): Unit = {
+    System.out.flush()
+    println("$$$ ??? " + msg)
+    System.out.flush()
+
+    val f = output.toPath.resolveSibling(s"${UUID.randomUUID()}.jar")
+    Files.copy(output.toPath, f)
+    Files.move(f, output.toPath, StandardCopyOption.REPLACE_EXISTING)
+
+    System.out.flush()
+    println(s"$$$$$$ !!! $msg")
+    System.out.flush()
+  }
+
+  def touchOutputFile(output: Output, msg: String): Unit = {
+    STJUtil.extractJarOutput(output).foreach { jarOut =>
+      if (jarOut.exists()) {
+        STJUtil.touchOutputFile(jarOut, msg)
+      }
+    }
+  }
+
+  def outputMustNotExist(output: Output): Unit = {
+    STJUtil.extractJarOutput(output).foreach { jarOut =>
+      if (jarOut.exists()) {
+        println(s"$jarOut exists :/")
+        throw new Exception(s"$jarOut exists :/")
+      } else {
+        println(s"$jarOut not exists; is ok ;D")
+      }
+    }
   }
 
 }

@@ -101,6 +101,7 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
   def lookupProject(name: String): ProjectStructure = buildStructure(name)
 
   override def apply(command: String, arguments: List[String], state: State): State = {
+    println(s"><><><>< running $command with ${arguments.mkString(" ")} in $state")
     val splitCommands = command.split("/").toList
     // Note that root does not do aggregation as sbt does.
     val (project, commandToRun) = splitCommands match {
@@ -174,8 +175,12 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
               _.getAbsoluteFile
             }
             val loader = ClasspathUtilities.makeLoader(classpath, i.si, directory)
-            val main = p.getMainMethod(mainClassName, loader)
-            p.invokeMain(loader, main, params)
+            try {
+              val main = p.getMainMethod(mainClassName, loader)
+              p.invokeMain(loader, main, params)
+            } finally {
+              loader.close()
+            }
           case s =>
             throw new TestFailed(s"Found more than one main class: $s")
         }
@@ -342,7 +347,7 @@ case class ProjectStructure(
           val (_, cls) = STJUtil.toJarAndFile(file.toString)
           cls
         } else {
-          relativeClassDir(file).getPath
+          relativeClassDir(file).getPath.replace('\\', '/')
         }
       }
     }
