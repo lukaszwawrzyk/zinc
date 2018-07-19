@@ -93,7 +93,7 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
       implicit val projectFormat =
         caseClass(Project.apply _, Project.unapply _)("name", "dependsOn", "in", "scalaVersion")
       implicit val buildFormat = caseClass(Build.apply _, Build.unapply _)("projects")
-      val json = JsonParser.parseFromFile(directory / "build.json").get
+      val json = JsonParser.parseFromChannel(new FileInputStream(directory / "build.json").getChannel).get
       Converter.fromJsonUnsafe[Build](json)
     } else Build(projects = Vector(Project(name = RootIdentifier).copy(in = Some(directory))))
   }
