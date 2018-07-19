@@ -1,6 +1,6 @@
 package sbt.internal.inc
 
-import java.net.URI
+import java.net.{ URI, URL }
 
 import sbt.io.IO
 import java.util.zip.ZipFile
@@ -13,6 +13,7 @@ import java.nio.file._
 import scala.util.{ Random, Try }
 import java.util.UUID
 
+import sbt.io.IO.{ toFile, FileScheme }
 import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 
@@ -102,11 +103,37 @@ object STJUtil {
 
   def fromJarUriAndFile(u: URI, f: String): String = {
     val jar = {
-      val j = u.toString.stripPrefix("jar:file:")
-      new File(if (isWindows) j.stripPrefix("/").replace("/", "\\") else j)
+      uriToFile(URI.create(u.toURL.getPath))
     }
 
     init(jar, f.stripPrefix("/"))
+  }
+
+  /**
+    * Converts the given file URI to a File.
+    */
+  private[this] def uriToFile(uri: URI): File = {
+    val part = uri.getSchemeSpecificPart
+    // scheme might be omitted for relative URI reference.
+    assert(
+      Option(uri.getScheme) match {
+        case None | Some(FileScheme) => true
+        case _                       => false
+      },
+      s"Expected protocol to be '$FileScheme' or empty in URI $uri"
+    )
+    Option(uri.getAuthority) match {
+      case None if part startsWith "/" => new File(uri)
+      case _                           =>
+        // https://github.com/sbt/sbt/issues/564
+        // https://github.com/sbt/sbt/issues/3086
+        // http://blogs.msdn.com/b/ie/archive/2006/12/06/file-uris-in-windows.aspx
+        // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=5086147
+        // The specific problem here is that `uri` will have a defined authority component for UNC names like //foo/bar/some/path.jar
+        // but the File constructor requires URIs with an undefined authority component.
+        if (!(part startsWith "/") && (part contains ":")) new File("//" + part)
+        else new File(part)
+    }
   }
 
   def toJarUriAndFile(s: String): (URI, String) = {
