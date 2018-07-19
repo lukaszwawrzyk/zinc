@@ -9,7 +9,7 @@ package xsbt
 
 import java.io.File
 import java.net.URI
-import java.nio.file.{ FileSystem, FileSystems, Files }
+import java.nio.file.{ FileSystems, FileSystem, Files }
 import java.util.jar.JarFile
 import java.util.zip.ZipFile
 
@@ -93,19 +93,25 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
   }
 
   private object STJUtil {
-    def init(jar: File, cls: String): String = jar + "!" + cls.replace("\\", "/")
+    def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
+
+    def init(jar: File, cls: String): String = jar + "!" + (if (isWindows) cls.replace("/", "\\") else cls)
 
     def toJarAndFile(s: String): (File, String) = {
       val Array(jar, file) = s.split("!")
-      (new File(jar), file)
+      (new File(jar), file.replace("\\", "/"))
     }
 
     def existsInJar(s: String): Boolean = {
       val (jar, cls) = toJarAndFile(s)
-      val file = new ZipFile(jar, ZipFile.OPEN_READ)
-      val exists = file.getEntry(cls) != null
-      file.close()
-      exists
+      if (!jar.exists()) {
+        false
+      } else {
+        val file = new ZipFile(jar, ZipFile.OPEN_READ)
+        val exists = file.getEntry(cls) != null
+        file.close()
+        exists
+      }
     }
   }
 

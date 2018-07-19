@@ -94,7 +94,7 @@ object STJUtil {
 
   def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
-  def init(jar: File, cls: String): String = jar + "!" + cls.replace("\\", "/")
+  def init(jar: File, cls: String): String = jar + "!" + (if (isWindows) cls.replace("/", "\\") else cls)
 
   def fromUrl(u: URL): String = {
     val Array(jarUri, cls) = u.toString.split("!")
@@ -103,7 +103,7 @@ object STJUtil {
 
   def fromJarUriAndFile(u: URI, f: String): String = {
     val jar = uriToFile(URI.create(u.toString.stripPrefix("jar:")))
-    init(jar, f.stripPrefix("/"))
+    init(jar, f.stripPrefix("/").stripPrefix("\\"))
   }
 
   // From sbt.io.IO, correctly handles uri like: file:<even a windows path>
@@ -134,7 +134,7 @@ object STJUtil {
   def toJarUriAndFile(s: String): (URI, String) = {
     val Array(jar0, cls) = s.split("!")
     val uri = rawPathToJarUri(jar0)
-    val path = "/" + cls
+    val path = (if (isWindows) "\\" else "/") + cls
     (uri, path)
   }
 
@@ -188,7 +188,7 @@ object STJUtil {
 
   def toJarAndFile(s: String): (File, String) = {
     val Array(jar, file) = s.split("!")
-    (new File(jar), file)
+    (new File(jar), file.replace("\\", "/"))
   }
 
   def existsInJar(s: String): Boolean = {
