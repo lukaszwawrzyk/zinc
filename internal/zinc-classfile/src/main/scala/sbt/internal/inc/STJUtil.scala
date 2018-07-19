@@ -102,16 +102,11 @@ object STJUtil {
   }
 
   def fromJarUriAndFile(u: URI, f: String): String = {
-    val jar = {
-      uriToFile(URI.create(u.toURL.getPath))
-    }
-
+    val jar = uriToFile(URI.create(u.toString.stripPrefix("jar:")))
     init(jar, f.stripPrefix("/"))
   }
 
-  /**
-    * Converts the given file URI to a File.
-    */
+  // From sbt.io.IO, correctly handles uri like: file:<even a windows path>
   private[this] def uriToFile(uri: URI): File = {
     val part = uri.getSchemeSpecificPart
     // scheme might be omitted for relative URI reference.
