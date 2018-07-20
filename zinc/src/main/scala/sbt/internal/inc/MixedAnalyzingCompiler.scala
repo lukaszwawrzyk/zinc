@@ -10,15 +10,15 @@ package internal
 package inc
 
 import java.io.File
-import java.lang.ref.{ Reference, SoftReference }
-import java.nio.file.Files
-import java.util.{ Optional, UUID }
+import java.lang.ref.{ SoftReference, Reference }
+import java.nio.file.{ Files, StandardCopyOption }
+import java.util.{ UUID, Optional }
 
 import inc.javac.AnalyzingJavaCompiler
 import xsbti.{ Reporter, AnalysisCallback => XAnalysisCallback }
 import xsbti.compile.CompileOrder._
 import xsbti.compile._
-import sbt.io.IO
+import sbt.io.{ IO, DirectoryFilter }
 import sbt.util.{ InterfaceUtil, Logger }
 import sbt.internal.inc.JavaInterfaceUtil.EnrichOption
 import sbt.internal.inc.caching.ClasspathCache
@@ -125,6 +125,27 @@ final class MixedAnalyzingCompiler(
                 log,
                 config.progress
               )
+
+              import sbt.io.syntax._
+              val classes = (outputDir ** -DirectoryFilter).get.flatMap { classFile =>
+                println(s"Processing $classFile")
+                IO.relativize(outputDir, classFile) match {
+                  case Some(relPath) =>
+                    println(s"Rel path is $relPath")
+                    List((classFile, relPath))
+                  case _ => Nil
+                }
+              }
+
+              STJ.withZipFs(outputJar, create = true) { fs =>
+                classes.foreach {
+                  case (classFile, target) =>
+                    val targetPath = fs.getPath(target)
+                    Files.createDirectories(targetPath.getParent)
+                    Files.copy(classFile.toPath, targetPath, StandardCopyOption.REPLACE_EXISTING)
+                }
+              }
+              outputDir.delete()
             case None =>
               javac(identity).compile(
                 javaSrcs,

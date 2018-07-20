@@ -19,7 +19,7 @@ import xsbti.compile.{ Output, SingleOutput }
 
 object STJ {
 
-  def withZipFs[A](uri: URI, create: Boolean = false)(action: FileSystem => A): A = {
+  def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
     val env = new java.util.HashMap[String, String]
     if (create) env.put("create", "true")
     val fs = FileSystems.newFileSystem(uri, env)
@@ -29,8 +29,8 @@ object STJ {
     }
   }
 
-  def withZipFs[A](file: File)(action: FileSystem => A): A = {
-    withZipFs(fileToJarUri(file))(action)
+  def withZipFs[A](file: File, create: Boolean = false)(action: FileSystem => A): A = {
+    withZipFs(fileToJarUri(file), create)(action)
   }
 
   // puts all files in `from` (overriding the original files in case of conflicts)

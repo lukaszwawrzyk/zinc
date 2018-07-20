@@ -128,7 +128,7 @@ object ClassFileManager {
             val targetJar = realToTmpJars.getOrElse(jar, newTmpJar)
             for (c <- classes) {
               movedJaredClasses.put(STJ.fromJarUriAndRelClass(jar, c), targetJar)
-              STJ.withZipFs(jar) { srcFs =>
+              STJ.withZipFs(jar, create = false) { srcFs =>
                 STJ.withZipFs(targetJar, create = true) { dstFs =>
                   val src = srcFs.getPath(c)
                   val dst = dstFs.getPath(c)
