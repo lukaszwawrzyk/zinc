@@ -180,10 +180,7 @@ object ClassFileManager {
           s"Restoring jared class files: \n${showFiles(movedJaredClasses.keys.map(new File(_)))}")
         toMove.foreach {
           case (srcJar, tmpJar) =>
-            val tmpSrc = tmpJar.toPath.resolveSibling("~~tmp~cfm~merge~~.jar").toFile
-            Files.copy(srcJar.toPath, tmpSrc.toPath, StandardCopyOption.REPLACE_EXISTING)
-            STJ.mergeJars(into = tmpSrc, from = tmpJar)
-            Files.move(tmpSrc.toPath, srcJar.toPath, StandardCopyOption.REPLACE_EXISTING)
+            STJ.mergeJars(into = srcJar, from = tmpJar)
         }
       }
       logger.debug(s"Removing the temporary directory used for backing up class files: $tempDir")
