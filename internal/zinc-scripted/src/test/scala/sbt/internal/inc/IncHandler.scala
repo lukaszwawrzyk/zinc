@@ -348,7 +348,7 @@ case class ProjectStructure(
       val productFiles = analysis.relations.products(baseDirectory / srcFile)
       productFiles.map { file =>
         if (STJUtil.isJar(file)) {
-          val (_, cls) = STJUtil.toJarAndFile(file.toString)
+          val (_, cls) = STJUtil.toJarAndRelClass(file.toString)
           cls
         } else {
           relativeClassDir(file).getPath.replace('\\', '/')

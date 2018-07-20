@@ -234,8 +234,7 @@ private final class AnalysisCallback(
                 classFile
               } else {
                 if (STJUtil.isJar(classFile)) {
-                  val (jar, _) = STJUtil.toJarAndFile(classFile.toString)
-                  jar
+                  STJUtil.jaredClassToJarFile(classFile.toString)
                 } else {
                   Try(IO.urlAsFile(new URL(classFile.toString))).toOption.flatten
                     .getOrElse(classFile)

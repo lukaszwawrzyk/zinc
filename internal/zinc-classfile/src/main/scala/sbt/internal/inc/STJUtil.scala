@@ -90,7 +90,6 @@ object STJUtil {
     } else Nil
   }
 
-
   type JaredClass = String
   type RelClass = String
 
