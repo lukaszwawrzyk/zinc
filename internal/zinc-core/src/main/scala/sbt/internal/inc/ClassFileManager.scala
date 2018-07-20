@@ -48,13 +48,13 @@ object ClassFileManager {
 
     override def delete(classes: Array[File]): Unit = {
       val (jared, regular) = splitToClassesAndJars(classes)
+      // regular
       IO.deleteFilesEmptyDirs(regular)
+      // jared
       groupByJars(jared).foreach {
         case (jar, classes) =>
-          // _PROBABLY_ DOES NOT TOUCH OUTPUT.JAR !!!
           STJUtil.removeFromJar(jar, classes)
       }
-
     }
 
     override def generated(classes: Array[File]): Unit = ()
@@ -87,7 +87,7 @@ object ClassFileManager {
 
     private[this] val generatedClasses = new mutable.HashSet[File]
     private[this] val movedClasses = new mutable.HashMap[File, File]
-    private[this] val movedJaredClasses = new mutable.HashMap[File, URI]
+    private[this] val movedJaredClasses = new mutable.HashMap[STJUtil.JaredClass, URI]
     private[this] val realToTmpJars = new mutable.HashMap[URI, URI]
 
     private def showFiles(files: Iterable[File]): String = {
@@ -115,24 +115,19 @@ object ClassFileManager {
 
       // logic for jared classes
       locally {
-        val toBeBackedUp =
-          jared.filter(
-            c =>
-              // OPENS OUTPUT.JAR !!!
-              STJUtil.existsInJar(c.toString) && !movedJaredClasses.contains(c) && !generatedClasses
-                .contains(c))
-        show(s"We backup jared class files:\n${showFiles(toBeBackedUp)}")
-
+        val toBeBackedUp = jared.filter { jc =>
+          STJUtil.existsInJar(jc) && !movedJaredClasses.contains(jc) && !generatedClasses.contains(
+            new File(jc))
+        }
+        show(s"We backup jared class files:\n${showFiles(toBeBackedUp.map(new File(_)))}")
         groupByJars(toBeBackedUp).foreach {
           case (jar, classes) =>
-            val targetJar = realToTmpJars.getOrElse(
-              jar,
-              STJUtil.fileToJarUri(new File(tempDir, UUID.randomUUID.toString + ".jar")))
-            // copy to target jar all classes
+            // backup
+            def newTmpJar =
+              STJUtil.fileToJarUri(new File(tempDir, UUID.randomUUID.toString + ".jar"))
+            val targetJar = realToTmpJars.getOrElse(jar, newTmpJar)
             for (c <- classes) {
-              movedJaredClasses.put(new File(STJUtil.fromJarUriAndRelClass(jar, c)), targetJar)
-
-              // OPENS OUTPUT.JAR !!! (one of those calls, analyze further, probably `jar`)
+              movedJaredClasses.put(STJUtil.fromJarUriAndRelClass(jar, c), targetJar)
               STJUtil.withZipFs(jar) { srcFs =>
                 STJUtil.withZipFs(targetJar, create = true) { dstFs =>
                   val src = srcFs.getPath(c)
@@ -144,9 +139,8 @@ object ClassFileManager {
                 }
               }
             }
-            // maybe "move" should be handled as I am copying but probably handled by next line
+            // remove
             show(s"Removing ${classes.toList.mkString("\n")} from $jar")
-            // OPENS OUTPUT.JAR !!!
             STJUtil.removeFromJar(jar, classes)
         }
       }
@@ -158,40 +152,37 @@ object ClassFileManager {
       ()
     }
 
-    private def show(a: String): Unit = {
-      println("~~[CFM] " + a)
-    }
-
     override def complete(success: Boolean): Unit = {
       if (!success) {
         show("Rolling back changes to class files.")
         show(s"Removing generated classes:\n${showFiles(generatedClasses)}")
         locally {
           val (jared, regular) = splitToClassesAndJars(generatedClasses)
+          // regular
           IO.deleteFilesEmptyDirs(regular)
+          // jared
           groupByJars(jared).foreach {
-            // OPENS OUTPUT.JAR !!!
             case (jar, classes) => STJUtil.removeFromJar(jar, classes)
           }
         }
 
+        // regular
         show(s"Restoring class files: \n${showFiles(movedClasses.keys)}")
         for ((orig, tmp) <- movedClasses) IO.move(tmp, orig)
 
-        ///
+        // jared
         val toMove = movedJaredClasses.toSeq.map {
-          case (srcFile, tmpJar) =>
-            // jar# to file
-            val srcJar = STJUtil.jaredClassToJarFile(srcFile.toString)
+          case (jaredClass, tmpJar) =>
+            val srcJar = STJUtil.jaredClassToJarFile(jaredClass)
             (srcJar, STJUtil.jarUriToFile(tmpJar))
         }.distinct
-        show(s"Restoring jared class files: \n${showFiles(movedJaredClasses.keys)}")
+        show(
+          s"Restoring jared class files: \n${showFiles(movedJaredClasses.keys.map(new File(_)))}")
         toMove.foreach {
           case (srcJar, tmpJar) =>
             val tmpSrc = tmpJar.toPath.resolveSibling("~~tmp~cfm~merge~~.jar").toFile
-            Files.copy(srcJar.toPath, tmpSrc.toPath)
+            Files.copy(srcJar.toPath, tmpSrc.toPath, StandardCopyOption.REPLACE_EXISTING)
             STJUtil.mergeJars(into = tmpSrc, from = tmpJar)
-            // MOVES ON OUTPUT.JAR !!!
             Files.move(tmpSrc.toPath, srcJar.toPath, StandardCopyOption.REPLACE_EXISTING)
         }
       }
@@ -204,17 +195,24 @@ object ClassFileManager {
       IO.move(c, target)
       target
     }
+
+    private def show(a: String): Unit = {
+      println("~~[CFM] " + a)
+    }
   }
 
-  private def groupByJars(jared: Iterable[File]): Map[URI, Iterable[String]] = {
+  private def groupByJars(
+      jared: Iterable[STJUtil.JaredClass]): Map[URI, Iterable[STJUtil.RelClass]] = {
     jared
-      .map(f => STJUtil.toJarUriAndRelClass(f.toString))
+      .map(jc => STJUtil.toJarUriAndRelClass(jc))
       .groupBy(_._1)
       .mapValues(_.map(_._2))
   }
 
-  private def splitToClassesAndJars(classes: Iterable[File]) = {
-    classes.partition(STJUtil.isJar)
+  private def splitToClassesAndJars(
+      classes: Iterable[File]): (Iterable[STJUtil.JaredClass], Iterable[File]) = {
+    val (jars, classFiles) = classes.partition(STJUtil.isJar)
+    (jars.map(_.toString), classFiles)
   }
 
 }

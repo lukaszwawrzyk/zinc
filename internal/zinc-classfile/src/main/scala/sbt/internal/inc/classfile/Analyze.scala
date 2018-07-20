@@ -16,10 +16,9 @@ import scala.annotation.tailrec
 import java.io.File
 import java.net.URL
 
-import sbt.io.IO
 import xsbti.api.DependencyContext
 import xsbti.api.DependencyContext._
-import sbt.io.IO.{ FileScheme, toFile }
+import sbt.io.IO
 import sbt.util.Logger
 
 private[sbt] object Analyze {
@@ -182,7 +181,7 @@ private[sbt] object Analyze {
   // copied and edited from IO
   private def urlAsFile0(url: URL): Option[File] =
     url.getProtocol match {
-      case FileScheme => Some(toFile(url))
+      case IO.FileScheme => Some(IO.toFile(url))
       case "jar" =>
         Some(new File(STJUtil.fromUrl(url)))
       case _ => None
