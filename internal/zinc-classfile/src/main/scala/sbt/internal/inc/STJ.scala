@@ -22,23 +22,10 @@ object STJ {
   def withZipFs[A](uri: URI, create: Boolean = false)(action: FileSystem => A): A = {
     val env = new java.util.HashMap[String, String]
     if (create) env.put("create", "true")
-    synchronized {
-      val fs = FileSystems.newFileSystem(uri, env)
-      try action(fs)
-      finally {
-        retry(fs.close())
-      }
-    }
-  }
-
-  def retry(action: => Unit): Unit = {
-    try action
-    catch {
-      case _: FileSystemException =>
-        Thread.sleep(200)
-        println(
-          s"~@@@@@@@@~ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RETRY IN PLACE ${Random.nextInt}")
-        retry(action)
+    val fs = FileSystems.newFileSystem(uri, env)
+    try action(fs)
+    finally {
+      fs.close()
     }
   }
 
@@ -281,7 +268,7 @@ object STJ {
   def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
     val jarFile = jarUriToFile(jar)
     if (jarFile.exists()) {
-      STJ.withZipFs(jarFile) { fs =>
+      withZipFs(jarFile) { fs =>
         classes.foreach { cls =>
           Files.delete(fs.getPath(cls))
         }
