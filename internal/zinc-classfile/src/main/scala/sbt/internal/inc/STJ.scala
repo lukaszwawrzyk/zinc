@@ -279,16 +279,13 @@ object STJ {
   }
 
   def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
-    val origFile = jarUriToFile(jar)
-    if (origFile.exists()) {
-      val tmpFile = origFile.toPath.resolveSibling("~~removing~tmp~~.jar").toFile
-      Files.copy(origFile.toPath, tmpFile.toPath, StandardCopyOption.REPLACE_EXISTING)
-      STJ.withZipFs(tmpFile) { fs =>
+    val jarFile = jarUriToFile(jar)
+    if (jarFile.exists()) {
+      STJ.withZipFs(jarFile) { fs =>
         classes.foreach { cls =>
           Files.delete(fs.getPath(cls))
         }
       }
-      Files.move(tmpFile.toPath, origFile.toPath, StandardCopyOption.REPLACE_EXISTING)
     }
   }
 
