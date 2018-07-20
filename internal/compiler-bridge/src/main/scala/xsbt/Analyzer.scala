@@ -8,9 +8,6 @@
 package xsbt
 
 import java.io.File
-import java.net.URI
-import java.nio.file.{ FileSystems, FileSystem, Files }
-import java.util.jar.JarFile
 import java.util.zip.ZipFile
 
 import scala.tools.nsc.Phase
@@ -75,16 +72,17 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
 
   private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
     outputDirs.flatMap { jarFile =>
-      val relativeFile =
+      val classFile =
         fileForClass(new java.io.File("."), sym, separatorRequired).toString
           .drop(2) // stripPrefix ./ or .\
-      val uri = STJUtil.init(jarFile, relativeFile)
-      if (STJUtil.existsInJar(uri)) {
-        // construct the real, final name
-        val dir = jarFile.toPath.getParent
-        val name = jarFile.getName.split("_tmpjarsep_")(1)
-        val finalJarFile = dir.resolve(name)
-        val finalUri = STJUtil.init(finalJarFile.toFile, relativeFile)
+      val jaredClass = STJUtil.init(jarFile, classFile)
+      if (STJUtil.existsInJar(jaredClass)) {
+        // scalac is compiling to a temporary jar to avoid locking problems
+        // but in analysis output we want the actual, final jar. Its name
+        // is encoded in temp jar name after the separator
+        val finalJarName = jarFile.getName.split("_tmpjarsep_")(1)
+        val finalJarPath = jarFile.toPath.resolveSibling(finalJarName).toFile
+        val finalUri = STJUtil.init(finalJarPath, classFile)
         Some(new File(finalUri))
       } else {
         None
@@ -93,25 +91,33 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
   }
 
   private object STJUtil {
+    type JaredClass = String
+
     def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
-    def init(jar: File, cls: String): String =
-      jar + "!" + (if (isWindows) cls.replace("/", "\\") else cls)
+    def init(jar: File, cls: String): String = {
+      // to ensure consistent 'slashing' as those identifies are used e.g. in maps
+      val classPath = if (isWindows) cls.replace("/", "\\") else cls
+      s"$jar!$classPath"
+    }
 
-    def toJarAndFile(s: String): (File, String) = {
-      val Array(jar, file) = s.split("!")
-      (new File(jar), file.replace("\\", "/"))
+    def toJarAndRelClass(c: JaredClass): (File, String) = {
+      val Array(jar, relClass) = c.split("!")
+      // paths within jars always have forward slashes but JaredClass has system defined slashes
+      // because it is often stored in File that controls the slashes
+      val fixedRelClass = relClass.replace("\\", "/")
+      (new File(jar), fixedRelClass)
     }
 
     def existsInJar(s: String): Boolean = {
-      val (jar, cls) = toJarAndFile(s)
-      if (!jar.exists()) {
-        false
-      } else {
+      val (jar, cls) = toJarAndRelClass(s)
+      if (jar.exists()) {
         val file = new ZipFile(jar, ZipFile.OPEN_READ)
         val exists = file.getEntry(cls) != null
         file.close()
         exists
+      } else {
+        false
       }
     }
   }
