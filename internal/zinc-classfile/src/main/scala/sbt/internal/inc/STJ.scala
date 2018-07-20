@@ -204,59 +204,37 @@ object STJ {
   def withPreviousJar[A](output: Output)(compile: /*extra cp: */ Seq[File] => A): A = {
     extractJarOutput(output)
       .map { outputJar =>
+        val tmpJarPrefix = "tmpjar"
+        def tmpJar(file: File, id: String) = {
+          file.toPath.resolveSibling(s"$tmpJarPrefix$id${UUID.randomUUID()}.jar").toFile
+        }
+
         // cleanup stuff from other compilations
-        pause("Trying to get rid of tmpjars")
         Option(outputJar.toPath.getParent.toFile.listFiles()).foreach { files =>
           files
-            .filter(f => f.getName.endsWith(".jar") && f.getName.startsWith("tmpjar"))
+            .filter(f => f.getName.endsWith(".jar") && f.getName.startsWith(tmpJarPrefix))
             .foreach(f => Try(f.delete()))
         }
 
-        val prevJar =
-          outputJar.toPath.resolveSibling("tmpjarprev" + UUID.randomUUID() + ".jar").toFile
+        val prevJar = tmpJar(outputJar, "prev")
         if (outputJar.exists()) {
-          pause(s"Prev jar set as $prevJar output jar ($outputJar) exists so moving it ")
-          // MOVES OUTPUT.JAR !!!
           IO.move(outputJar, prevJar)
-          pause(s"Moved")
         }
 
-        pause(s"About to run compilation, will set $outputJar as output")
         val res = try compile(Seq(prevJar))
         catch {
           case e: Exception =>
-            pause("Compilation failed")
             if (prevJar.exists()) {
-              pause(s"Reverting prev jar $prevJar onto $outputJar")
-              // MOVES TO OUTPUT.JAR !!!
               IO.move(prevJar, outputJar)
-              pause("Reverted prev jar")
             }
             throw e
         }
 
-        if (prevJar.exists()) {
-          if (outputJar.exists()) {
-            // most complex case: scala compilation completed to a temp jar and prev jars exists, they need to be merged
-            val tmpTargetJar = prevJar.toPath.resolveSibling("~~merge~target~~.jar")
-            val tmpSrcJar = outputJar.toPath.resolveSibling("~~merge~source~~.jar")
-            pause(
-              s"Prev jar and temp out jar exist so merging those, will copy $prevJar on $tmpTargetJar")
-            Files.copy(prevJar.toPath, tmpTargetJar)
-            pause(s"Will copy $outputJar on $tmpSrcJar")
-            Files.copy(outputJar.toPath, tmpSrcJar)
-            pause(s"Prev jar and out jar exist so merging those $tmpTargetJar and $tmpSrcJar")
-            STJ.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
-            pause(s"merged, moving prevJar on outJar $tmpTargetJar to $outputJar")
-            // MOVES TO OUTPUT.JAR !!!
-            IO.move(tmpTargetJar.toFile, outputJar)
-            pause("Finally done")
-          } else {
-            // Java only compilation case - probably temporary as java should go to jar as well
-            pause("java path")
-            // MOVES TO OUTPUT.JAR !!!
-            IO.move(prevJar, outputJar)
-          }
+        if (prevJar.exists() && outputJar.exists()) {
+          val prevJarCopy = tmpJar(prevJar, "prevcopy")
+          Files.copy(prevJar.toPath, prevJarCopy.toPath)
+          STJ.mergeJars(into = prevJarCopy, from = outputJar)
+          IO.move(prevJarCopy, outputJar)
         }
         res
       }
