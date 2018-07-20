@@ -63,6 +63,7 @@ final class AnalyzingJavaCompiler private[sbt] (
       sources: Seq[File],
       options: Seq[String],
       output: Output,
+      finalJarOutput: Option[File],
       callback: AnalysisCallback,
       incToolOptions: IncToolOptions,
       reporter: XReporter,
@@ -158,7 +159,7 @@ final class AnalyzingJavaCompiler private[sbt] (
       timed(javaAnalysisPhase, log) {
         for ((classesFinder, oldClasses, srcs) <- memo) {
           val newClasses = Set(classesFinder.get: _*) -- oldClasses
-          Analyze(newClasses.toSeq, srcs, log)(callback, loader, readAPI)
+          Analyze(newClasses.toSeq, srcs, log, output, finalJarOutput)(callback, loader, readAPI)
         }
       }
 

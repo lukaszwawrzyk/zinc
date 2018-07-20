@@ -11,7 +11,7 @@ package inc
 package classfile
 
 import scala.collection.mutable
-import mutable.{ ArrayBuffer, Buffer }
+import mutable.{ Buffer, ArrayBuffer }
 import scala.annotation.tailrec
 import java.io.File
 import java.net.URL
@@ -20,9 +20,15 @@ import xsbti.api.DependencyContext
 import xsbti.api.DependencyContext._
 import sbt.io.IO
 import sbt.util.Logger
+import xsbti.compile.{ Output, SingleOutput }
 
 private[sbt] object Analyze {
-  def apply[T](newClasses: Seq[File], sources: Seq[File], log: Logger)(
+
+  def apply[T](newClasses: Seq[File],
+               sources: Seq[File],
+               log: Logger,
+               output: Output,
+               finalJarOutput: Option[File])(
       analysis: xsbti.AnalysisCallback,
       loader: ClassLoader,
       readAPI: (File, Seq[Class[_]]) => Set[(String, String)]): Unit = {
@@ -68,11 +74,12 @@ private[sbt] object Analyze {
 
       val srcClassName = loadEnclosingClass(loadedClass)
 
+      val finalClassFile = resolveFinalClassFile(newClass, output, finalJarOutput)
       srcClassName match {
         case Some(className) =>
-          analysis.generatedNonLocalClass(source, newClass, binaryClassName, className)
+          analysis.generatedNonLocalClass(source, finalClassFile, binaryClassName, className)
           classNames += className
-        case None => analysis.generatedLocalClass(source, newClass)
+        case None => analysis.generatedLocalClass(source, finalClassFile)
       }
 
       sourceToClassFiles(source) += classFile
@@ -169,6 +176,23 @@ private[sbt] object Analyze {
       }
     }
   }
+
+  def resolveFinalClassFile(realClassFile: File,
+                            output: Output,
+                            finalJarOutput: Option[File]): File = {
+    finalJarOutput
+      .map { finalJarOutput =>
+        output match {
+          case s: SingleOutput =>
+            val outputDir = s.getOutputDirectory
+            val relativeClass = IO.relativize(outputDir, realClassFile).get
+            new File(STJ.init(finalJarOutput, relativeClass))
+          case _ => realClassFile // I don't know what to do
+        }
+      }
+      .getOrElse(realClassFile)
+  }
+
   private[this] def urlAsFile(url: URL, log: Logger): Option[File] =
     try {
       urlAsFile0(url)

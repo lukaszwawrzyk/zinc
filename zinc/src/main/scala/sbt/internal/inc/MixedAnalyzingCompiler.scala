@@ -119,6 +119,7 @@ final class MixedAnalyzingCompiler(
                 javaSrcs,
                 joptions,
                 CompileOutput(outputDir),
+                Some(outputJar),
                 callback,
                 incToolOptions,
                 config.reporter,
@@ -142,7 +143,10 @@ final class MixedAnalyzingCompiler(
                   case (classFile, target) =>
                     val targetPath = fs.getPath(target)
                     Files.createDirectories(targetPath.getParent)
-                    Files.copy(classFile.toPath, targetPath, StandardCopyOption.REPLACE_EXISTING)
+                    Files.copy(classFile.toPath,
+                               targetPath,
+                               StandardCopyOption.REPLACE_EXISTING,
+                               StandardCopyOption.COPY_ATTRIBUTES)
                 }
               }
               outputDir.delete()
@@ -151,6 +155,7 @@ final class MixedAnalyzingCompiler(
                 javaSrcs,
                 joptions,
                 output,
+                finalJarOutput = None,
                 callback,
                 incToolOptions,
                 config.reporter,
