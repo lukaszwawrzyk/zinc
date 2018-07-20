@@ -107,8 +107,7 @@ final class MixedAnalyzingCompiler(
           STJ.extractJarOutput(output) match {
             case Some(outputJar) =>
               val outputDir = CompileOutput(outputJar.getParentFile)
-              val tmpJar =
-                outputJar.toPath.resolveSibling(s"tmpjarforjava${UUID.randomUUID()}.jar").toFile
+              val tmpJar = STJ.tmpJar(outputJar, "forjava")
               if (outputJar.exists()) {
                 Files.copy(outputJar.toPath, tmpJar.toPath)
               }
