@@ -130,7 +130,7 @@ object ClassFileManager {
               STJUtil.fileToJarUri(new File(tempDir, UUID.randomUUID.toString + ".jar")))
             // copy to target jar all classes
             for (c <- classes) {
-              movedJaredClasses.put(new File(STJUtil.fromJarUriAndFile(jar, c)), targetJar)
+              movedJaredClasses.put(new File(STJUtil.fromJarUriAndRelClass(jar, c)), targetJar)
 
               // OPENS OUTPUT.JAR !!! (one of those calls, analyze further, probably `jar`)
               STJUtil.withZipFs(jar) { srcFs =>
@@ -182,7 +182,7 @@ object ClassFileManager {
         val toMove = movedJaredClasses.toSeq.map {
           case (srcFile, tmpJar) =>
             // jar# to file
-            val srcJar = STJUtil.rawIdToJarFile(srcFile.toString)
+            val srcJar = STJUtil.jaredClassToJarFile(srcFile.toString)
             (srcJar, STJUtil.jarUriToFile(tmpJar))
         }.distinct
         show(s"Restoring jared class files: \n${showFiles(movedJaredClasses.keys)}")
@@ -208,7 +208,7 @@ object ClassFileManager {
 
   private def groupByJars(jared: Iterable[File]): Map[URI, Iterable[String]] = {
     jared
-      .map(f => STJUtil.toJarUriAndFile(f.toString))
+      .map(f => STJUtil.toJarUriAndRelClass(f.toString))
       .groupBy(_._1)
       .mapValues(_.map(_._2))
   }

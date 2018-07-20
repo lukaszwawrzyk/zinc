@@ -1,6 +1,6 @@
 package sbt.internal.inc
 
-import java.net.{ URL, URI }
+import java.net.URI
 
 import sbt.io.IO
 import java.util.zip.ZipFile
@@ -13,7 +13,7 @@ import java.nio.file._
 import scala.util.{ Random, Try }
 import java.util.UUID
 
-import sbt.io.IO.{ FileScheme, toFile }
+import sbt.io.IO.FileScheme
 import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 
@@ -31,14 +31,14 @@ object STJUtil {
     }
   }
 
-  def retry(f: => Unit): Unit = {
-    try f
+  def retry(action: => Unit): Unit = {
+    try action
     catch {
       case _: FileSystemException =>
         Thread.sleep(200)
         println(
           s"~@@@@@@@@~ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RETRY IN PLACE ${Random.nextInt}")
-        retry(f)
+        retry(action)
     }
   }
 
@@ -46,6 +46,8 @@ object STJUtil {
     withZipFs(fileToJarUri(file))(action)
   }
 
+  // puts all files in `from` (overriding the original files in case of conflicts)
+  // into `to`, removing `from`. In other words it merges `from` into `into`.
   def mergeJars(into: File, from: File): Unit = {
     withZipFs(into) { intoFs =>
       withZipFs(from) { fromFs =>
@@ -68,16 +70,12 @@ object STJUtil {
     from.delete()
   }
 
-  def pause(s: String): Unit = {
-//    forcePause(s)
-    println(s)
+  // useful for debuging files
+  def pause(msg: String): Unit = {
+//    scala.io.StdIn.readLine(s)
+    println(msg)
   }
 
-  def forcePause(s: String): Unit = {
-    scala.io.StdIn.readLine(s)
-  }
-
-  // only for debugging
   def listFiles(f: File): Seq[String] = {
     if (f.exists()) {
       withZipFs(f) { fs =>
@@ -92,19 +90,29 @@ object STJUtil {
     } else Nil
   }
 
+
+  type JaredClass = String
+  type RelClass = String
+
   def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
-  def init(jar: File, cls: String): String =
-    jar + "!" + (if (isWindows) cls.replace("/", "\\") else cls)
-
-  def fromUrl(u: URL): String = {
-    val Array(jarUri, cls) = u.toString.split("!")
-    fromJarUriAndFile(URI.create(jarUri), cls)
+  def init(jar: File, cls: RelClass): JaredClass = {
+    // to ensure consistent 'slashing' as those identifies are used e.g. in maps
+    val classPath = if (isWindows) cls.replace("/", "\\") else cls
+    s"$jar!$classPath"
   }
 
-  def fromJarUriAndFile(u: URI, f: String): String = {
-    val jar = uriToFile(URI.create(u.toString.stripPrefix("jar:")))
-    init(jar, f.stripPrefix("/").stripPrefix("\\"))
+  // from url like returned from class loader
+  def fromUrl(url: URL): JaredClass = {
+    val Array(jarUri, cls) = url.toString.split("!")
+    fromJarUriAndRelClass(URI.create(jarUri), cls)
+  }
+
+  def fromJarUriAndRelClass(jarUri: URI, cls: RelClass): JaredClass = {
+    val fileUri = URI.create(jarUri.toString.stripPrefix("jar:"))
+    val jar = uriToFile(fileUri)
+    val relClass = cls.stripPrefix("/").stripPrefix("\\")
+    init(jar, relClass)
   }
 
   // From sbt.io.IO, correctly handles uri like: file:<even a windows path>
@@ -132,31 +140,31 @@ object STJUtil {
     }
   }
 
-  def toJarUriAndFile(s: String): (URI, String) = {
-    val Array(jar0, cls) = s.split("!")
-    val uri = rawPathToJarUri(jar0)
+  // this trailing slash in RelPath is messed up
+  // I am not sure why I put trailing backslash here
+  def toJarUriAndRelClass(jc: JaredClass): (URI, RelClass) = {
+    val Array(jar, cls) = jc.split("!")
+    val uri = fileToJarUri(new File(jar))
     val path = (if (isWindows) "\\" else "/") + cls
     (uri, path)
   }
 
-  def rawIdToJarFile(s: String): File = {
-    val Array(jar, _) = s.toString.split("!")
+  def jaredClassToJarFile(jc: JaredClass): File = {
+    val Array(jar, _) = jc.split("!")
     new File(jar)
-  }
-
-  def fileToJarUri(file: File): URI = {
-    rawPathToJarUri(file.toString)
   }
 
   def jarUriToFile(jar: URI): File = {
     val x = jar.toString.stripPrefix("jar:file:")
-    val r = if (isWindows) x.stripPrefix("/").replace("/", "\\") else x
-    new File(r)
+    // TODO use something built in, more robust. This might fail with UNC
+    val path = if (isWindows) x.stripPrefix("/").replace("/", "\\") else x
+    new File(path)
   }
 
-  private def rawPathToJarUri(jar0: String) = {
-    val jar = if (isWindows) "/" + jar0.replace("\\", "/") else jar0
-    URI.create("jar:file:" + jar)
+  def fileToJarUri(jarFile: File): URI = {
+    // TODO use something built in, more robust. This might fail with UNC
+    val windowsSanitized = if (isWindows) "/" + jarFile.toString.replace("\\", "/") else jarFile
+    URI.create("jar:file:" + windowsSanitized)
   }
 
   def getModifiedTimeOrZero(file: File): Long = {
@@ -176,8 +184,8 @@ object STJUtil {
     }
   }
 
-  private def readModifiedTimeFromJar(s: String): Long = {
-    val (jar, cls) = toJarAndFile(s)
+  private def readModifiedTimeFromJar(jc: JaredClass): Long = {
+    val (jar, cls) = toJarAndRelClass(jc)
     if (jar.exists()) {
       // OPENS OUTPUT.JAR !!! (when collecting initial stamps)
       val file = new ZipFile(jar, ZipFile.OPEN_READ)
@@ -187,27 +195,30 @@ object STJUtil {
     } else 0
   }
 
-  def toJarAndFile(s: String): (File, String) = {
-    val Array(jar, file) = s.split("!")
-    (new File(jar), file.replace("\\", "/"))
+  def toJarAndRelClass(c: JaredClass): (File, RelClass) = {
+    val Array(jar, relClass) = c.split("!")
+    // paths within jars always have forward slashes but JaredClass has system defined slashes
+    // because it is often stored in File that controls the slashes
+    val fixedRelClass = relClass.replace("\\", "/")
+    (new File(jar), fixedRelClass)
   }
 
-  def existsInJar(s: String): Boolean = {
-    val (jar, cls) = toJarAndFile(s)
-    if (!jar.exists()) {
-      false
-    } else {
+  def existsInJar(s: JaredClass): Boolean = {
+    val (jar, cls) = toJarAndRelClass(s)
+    if (jar.exists()) {
       val file = new ZipFile(jar, ZipFile.OPEN_READ)
       val exists = file.getEntry(cls) != null
       file.close()
       exists
+    } else {
+      false
     }
   }
 
   def withPreviousJar[A](output: Output)(
       compile: ( /*extra cp: */ Seq[File], /*outputOverride: */ Output) => A): A = {
-    def singleOutput(f: File) = new SingleOutput {
-      def getOutputDirectory = f
+    def singleOutput(outputFile: File) = new SingleOutput {
+      def getOutputDirectory: File = outputFile
       override def toString = s"SingleOutput($getOutputDirectory)"
     }
 
@@ -294,12 +305,12 @@ object STJUtil {
       }
   }
 
-  def removeFromJar(jar: URI, classes: Iterable[String]): Unit = {
-    val origFile = STJUtil.jarUriToFile(jar)
+  def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
+    val origFile = jarUriToFile(jar)
     if (origFile.exists()) {
       val tmpFile = origFile.toPath.resolveSibling("~~removing~tmp~~.jar").toFile
-      Files.copy(origFile.toPath, tmpFile.toPath)
-      STJUtil.withZipFs(STJUtil.fileToJarUri(tmpFile)) { fs =>
+      Files.copy(origFile.toPath, tmpFile.toPath, StandardCopyOption.REPLACE_EXISTING)
+      STJUtil.withZipFs(tmpFile) { fs =>
         classes.foreach { cls =>
           Files.delete(fs.getPath(cls))
         }
@@ -311,7 +322,7 @@ object STJUtil {
   def extractJarOutput(output: Output): Option[File] = {
     output match {
       case s: SingleOutput =>
-        val out = s.getSingleOutput.get
+        val out = s.getOutputDirectory
         if (out.getName.endsWith(".jar")) {
           Some(out)
         } else None
@@ -320,35 +331,20 @@ object STJUtil {
 
   }
 
-  def touchOutputFile(output: File, msg: String): Unit = {
-    System.out.flush()
-    println("$$$ ??? " + msg)
-    System.out.flush()
-
-    val f = output.toPath.resolveSibling(s"${UUID.randomUUID()}.jar")
-    Files.copy(output.toPath, f)
-    Files.move(f, output.toPath, StandardCopyOption.REPLACE_EXISTING)
-
-    System.out.flush()
-    println(s"$$$$$$ !!! $msg")
-    System.out.flush()
-  }
-
+  // for debugging purposes, fails if file is currently open
   def touchOutputFile(output: Output, msg: String): Unit = {
     STJUtil.extractJarOutput(output).foreach { jarOut =>
       if (jarOut.exists()) {
-        STJUtil.touchOutputFile(jarOut, msg)
-      }
-    }
-  }
+        System.out.flush()
+        println("$$$ ??? " + msg)
+        System.out.flush()
 
-  def outputMustNotExist(output: Output): Unit = {
-    STJUtil.extractJarOutput(output).foreach { jarOut =>
-      if (jarOut.exists()) {
-        println(s"$jarOut exists :/")
-        throw new Exception(s"$jarOut exists :/")
-      } else {
-        println(s"$jarOut not exists; is ok ;D")
+        val f = jarOut.toPath.resolveSibling(s"${UUID.randomUUID()}.jar")
+        Files.copy(jarOut.toPath, f)
+        Files.move(f, jarOut.toPath, StandardCopyOption.REPLACE_EXISTING)
+
+        System.out.flush()
+        println(s"$$$$$$ !!! $msg")
       }
     }
   }

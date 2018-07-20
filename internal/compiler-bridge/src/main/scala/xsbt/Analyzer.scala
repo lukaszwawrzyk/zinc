@@ -92,16 +92,17 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
 
   private object STJUtil {
     type JaredClass = String
+    type RelClass = String
 
     def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
-    def init(jar: File, cls: String): String = {
+    def init(jar: File, cls: RelClass): JaredClass = {
       // to ensure consistent 'slashing' as those identifies are used e.g. in maps
       val classPath = if (isWindows) cls.replace("/", "\\") else cls
       s"$jar!$classPath"
     }
 
-    def toJarAndRelClass(c: JaredClass): (File, String) = {
+    def toJarAndRelClass(c: JaredClass): (File, RelClass) = {
       val Array(jar, relClass) = c.split("!")
       // paths within jars always have forward slashes but JaredClass has system defined slashes
       // because it is often stored in File that controls the slashes
@@ -109,7 +110,7 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       (new File(jar), fixedRelClass)
     }
 
-    def existsInJar(s: String): Boolean = {
+    def existsInJar(s: JaredClass): Boolean = {
       val (jar, cls) = toJarAndRelClass(s)
       if (jar.exists()) {
         val file = new ZipFile(jar, ZipFile.OPEN_READ)
