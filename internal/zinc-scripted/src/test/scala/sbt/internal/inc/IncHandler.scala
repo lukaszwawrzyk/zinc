@@ -96,7 +96,7 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
   def lookupProject(name: String): ProjectStructure = buildStructure(name)
 
   override def apply(command: String, arguments: List[String], state: State): State = {
-    println(s"><><><>< running $command with ${arguments.mkString(" ")} in $state")
+    println(s"><><><>< running $command with ${arguments.mkString(" ")}")
     val splitCommands = command.split("/").toList
     // Note that root does not do aggregation as sbt does.
     val (project, commandToRun) = splitCommands match {
@@ -341,8 +341,8 @@ case class ProjectStructure(
     def products(srcFile: String): Set[String] = {
       val productFiles = analysis.relations.products(baseDirectory / srcFile)
       productFiles.map { file =>
-        if (STJUtil.isJar(file)) {
-          val (_, cls) = STJUtil.toJarAndRelClass(file.toString)
+        if (STJ.isJar(file)) {
+          val (_, cls) = STJ.toJarAndRelClass(file.toString)
           cls
         } else {
           relativeClassDir(file).getPath.replace('\\', '/')
@@ -358,7 +358,7 @@ case class ProjectStructure(
 
   def checkNoGeneratedClassFiles(): Unit = {
     val allClassFiles = generatedClassFiles.get
-    val allJaredClassFiles = outputJar.toSeq.flatMap(STJUtil.listFiles).filter(_.endsWith(".class"))
+    val allJaredClassFiles = outputJar.toSeq.flatMap(STJ.listFiles).filter(_.endsWith(".class"))
     if (allClassFiles.nonEmpty || allJaredClassFiles.nonEmpty)
       sys.error(
         s"Classes existed:\n\t${allClassFiles.mkString("\n\t")} \n\t${allJaredClassFiles.mkString("\n\t")}")

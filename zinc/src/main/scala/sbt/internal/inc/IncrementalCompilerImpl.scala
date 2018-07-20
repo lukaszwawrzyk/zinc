@@ -45,7 +45,7 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
     import config._
     import setup._
     val output = CompileOutput(classesDirectory)
-    STJUtil.touchOutputFile(output, "befor compilation completely")
+    STJ.touchOutputFile(output, "befor compilation completely")
     val compilers = in.compilers
     val javacChosen = compilers.javaTools.javac
     val scalac = compilers.scalac
@@ -69,7 +69,7 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
       incrementalCompilerOptions,
       extraOptions
     )(logger)
-    STJUtil.touchOutputFile(output, "after compilation completely")
+    STJ.touchOutputFile(output, "after compilation completely")
     res
   }
 
@@ -248,7 +248,7 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
       // we add java output to classpath so that java analyzer can work properly
       // It seems that output is controlled by client but this is internal hack for now
       // eventually java output should be added to output.jar
-      val outputForJava = STJUtil.extractJarOutput(output).map(_.getParentFile)
+      val outputForJava = STJ.extractJarOutput(output).map(_.getParentFile)
 
       val config = MixedAnalyzingCompiler.makeConfig(
         scalaCompiler,

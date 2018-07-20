@@ -231,8 +231,8 @@ private final class AnalysisCallback(
             val cleanClassFile =
               if (classFile.exists()) {
                 classFile
-              } else if (STJUtil.isJar(classFile)) {
-                STJUtil.jaredClassToJarFile(classFile.toString)
+              } else if (STJ.isJar(classFile)) {
+                STJ.jaredClassToJarFile(classFile.toString)
               } else {
                 Try(IO.urlAsFile(new URL(classFile.toString))).toOption.flatten
                   .getOrElse(classFile)

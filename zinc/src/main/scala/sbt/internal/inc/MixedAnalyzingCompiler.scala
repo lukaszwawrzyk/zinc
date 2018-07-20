@@ -69,8 +69,8 @@ final class MixedAnalyzingCompiler(
     /** Compile Scala sources. */
     def compileScala(): Unit =
       if (scalaSrcs.nonEmpty) {
-        STJUtil.touchOutputFile(out, "befor compile scala")
-        STJUtil.withPreviousJar(out) { (extraClasspath, outputOverride) =>
+        STJ.touchOutputFile(out, "befor compile scala")
+        STJ.withPreviousJar(out) { (extraClasspath, outputOverride) =>
           val sources = if (config.currentSetup.order == Mixed) incSrc else scalaSrcs
           val arguments = cArgs(Nil,
                                 toAbsolute(extraClasspath) ++ absClasspath,
@@ -90,7 +90,7 @@ final class MixedAnalyzingCompiler(
             )
           }
         }
-        STJUtil.touchOutputFile(out, "after compile scala")
+        STJ.touchOutputFile(out, "after compile scala")
       }
 
     /** Compile java and run analysis. */
@@ -104,7 +104,7 @@ final class MixedAnalyzingCompiler(
             )
           val joptions = config.currentSetup.options.javacOptions
 
-          STJUtil.extractJarOutput(out) match {
+          STJ.extractJarOutput(out) match {
             case Some(outputJar) =>
               val outputDir = CompileOutput(outputJar.getParentFile)
               val tmpJar =
@@ -137,7 +137,7 @@ final class MixedAnalyzingCompiler(
                 config.progress
               )
           }
-          STJUtil.touchOutputFile(out, "Aftor compile Jawa")
+          STJ.touchOutputFile(out, "Aftor compile Jawa")
         }
       }
     }

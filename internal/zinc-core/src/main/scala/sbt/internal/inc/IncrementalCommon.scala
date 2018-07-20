@@ -30,7 +30,7 @@ import scala.util.{ Random, Try }
 
 private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options: IncOptions) {
 
-  import STJUtil.pause
+  import STJ.pause
 
   // setting the related system property to true will skip checking that the class name
   // still comes from the same classpath entry.  This can workaround bugs in classpath construction,

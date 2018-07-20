@@ -58,7 +58,7 @@ class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) 
     val absJarPath = new File(baseDirectory, jarPath).getPath
     val absoluteJarUri = s"jar:file:$absJarPath"
 
-    STJUtil.withZipFs(URI.create(absoluteJarUri)) { fs =>
+    STJ.withZipFs(URI.create(absoluteJarUri)) { fs =>
       Files.exists(fs.getPath(filePath))
     }
   }

@@ -75,14 +75,14 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       val classFile =
         fileForClass(new java.io.File("."), sym, separatorRequired).toString
           .drop(2) // stripPrefix ./ or .\
-      val jaredClass = STJUtil.init(jarFile, classFile)
-      if (STJUtil.existsInJar(jaredClass)) {
+      val jaredClass = STJ.init(jarFile, classFile)
+      if (STJ.existsInJar(jaredClass)) {
         // scalac is compiling to a temporary jar to avoid locking problems
         // but in analysis output we want the actual, final jar. Its name
         // is encoded in temp jar name after the separator
         val finalJarName = jarFile.getName.split("_tmpjarsep_")(1)
         val finalJarPath = jarFile.toPath.resolveSibling(finalJarName).toFile
-        val finalUri = STJUtil.init(finalJarPath, classFile)
+        val finalUri = STJ.init(finalJarPath, classFile)
         Some(new File(finalUri))
       } else {
         None
@@ -90,7 +90,7 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
     }.headOption
   }
 
-  private object STJUtil {
+  private object STJ {
     type JaredClass = String
     type RelClass = String
 

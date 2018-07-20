@@ -183,7 +183,7 @@ private[sbt] object Analyze {
     url.getProtocol match {
       case IO.FileScheme => Some(IO.toFile(url))
       case "jar" =>
-        Some(new File(STJUtil.fromUrl(url)))
+        Some(new File(STJ.fromUrl(url)))
       case _ => None
     }
 

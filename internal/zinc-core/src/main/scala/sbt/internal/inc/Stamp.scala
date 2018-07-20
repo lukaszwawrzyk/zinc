@@ -143,7 +143,7 @@ object Stamper {
 
   val forHash = (toStamp: File) => tryStamp(Hash.ofFile(toStamp))
   val forLastModified = { toStamp: File =>
-    tryStamp(new LastModified(STJUtil.getModifiedTimeOrZero(toStamp)))
+    tryStamp(new LastModified(STJ.getModifiedTimeOrZero(toStamp)))
   }
 
 }

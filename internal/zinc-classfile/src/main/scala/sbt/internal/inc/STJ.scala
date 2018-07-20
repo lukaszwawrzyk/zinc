@@ -17,7 +17,7 @@ import sbt.io.IO.FileScheme
 import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 
-object STJUtil {
+object STJ {
 
   def withZipFs[A](uri: URI, create: Boolean = false)(action: FileSystem => A): A = {
     val env = new java.util.HashMap[String, String]
@@ -269,7 +269,7 @@ object STJUtil {
             pause(s"Will copy $jarForStupidScalac on $tmpSrcJar")
             Files.copy(jarForStupidScalac.toPath, tmpSrcJar)
             pause(s"Prev jar and out jar exist so merging those $tmpTargetJar and $tmpSrcJar")
-            STJUtil.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
+            STJ.mergeJars(into = tmpTargetJar.toFile, from = tmpSrcJar.toFile)
             pause(s"merged, moving prevJar on outJar $tmpTargetJar to $outputJar")
             // MOVES TO OUTPUT.JAR !!!
             IO.move(tmpTargetJar.toFile, outputJar)
@@ -291,7 +291,7 @@ object STJUtil {
                        outputJar.toPath,
                        StandardCopyOption.COPY_ATTRIBUTES,
                        StandardCopyOption.REPLACE_EXISTING)
-            STJUtil.touchOutputFile(output, "After creating output jar")
+            STJ.touchOutputFile(output, "After creating output jar")
           } else {
             // there is no output jar, so it was a java compilation without prev jar, nothing to do
           }
@@ -309,7 +309,7 @@ object STJUtil {
     if (origFile.exists()) {
       val tmpFile = origFile.toPath.resolveSibling("~~removing~tmp~~.jar").toFile
       Files.copy(origFile.toPath, tmpFile.toPath, StandardCopyOption.REPLACE_EXISTING)
-      STJUtil.withZipFs(tmpFile) { fs =>
+      STJ.withZipFs(tmpFile) { fs =>
         classes.foreach { cls =>
           Files.delete(fs.getPath(cls))
         }
@@ -332,7 +332,7 @@ object STJUtil {
 
   // for debugging purposes, fails if file is currently open
   def touchOutputFile(output: Output, msg: String): Unit = {
-    STJUtil.extractJarOutput(output).foreach { jarOut =>
+    STJ.extractJarOutput(output).foreach { jarOut =>
       if (jarOut.exists()) {
         System.out.flush()
         println("$$$ ??? " + msg)
