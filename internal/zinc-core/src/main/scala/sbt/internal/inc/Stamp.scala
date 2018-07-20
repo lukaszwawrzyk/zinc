@@ -10,12 +10,10 @@ package internal
 package inc
 
 import java.io.{ File, IOException }
-import java.net.URI
-import java.nio.file.{ FileSystemNotFoundException, FileSystems, Files }
 import java.util
 import java.util.Optional
 
-import sbt.io.{ IO, Hash => IOHash }
+import sbt.io.{ Hash => IOHash }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 
 import scala.collection.immutable.TreeMap

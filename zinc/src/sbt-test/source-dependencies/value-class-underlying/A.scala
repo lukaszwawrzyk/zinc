@@ -1,3 +1,1 @@
-class A {
-  def text = "before (bad)"
-}
+class A(val x: Int) extends AnyVal

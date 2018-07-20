@@ -10,13 +10,10 @@ package internal
 package inc
 
 import java.io.File
-import java.nio.file.{ Files, StandardOpenOption }
 
-import sbt.io.IO
 import sbt.util.{ Logger, Level }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 import xsbti.compile.{
-  Output,
   DependencyChanges,
   IncOptions,
   CompileAnalysis,

@@ -10,20 +10,16 @@ import sbt.util.Logger
 import sbt.util.InterfaceUtil._
 import sbt.internal.inc.JavaInterfaceUtil.{ EnrichOptional, EnrichOption }
 import xsbt.api.Discovery
-import xsbti.{ Reporter, Problem, Severity }
+import xsbti.{ Problem, Severity }
 import xsbti.compile.{
   AnalysisContents,
   IncOptionsUtil,
   CompileAnalysis,
-  IncToolOptions,
   PerClasspathEntryLookup,
-  JavaCompiler,
   PreviousResult,
   ClasspathOptionsUtil,
   DefinesClass,
-  Javadoc,
   CompileOrder,
-  JavaTools,
   IncOptions,
   CompilerCache,
   Compilers => XCompilers
@@ -33,11 +29,9 @@ import sbt.io.syntax._
 import sbt.io.DirectoryFilter
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier.{ isStatic, isPublic }
-import java.nio.file.Files
 import java.util.{ Properties, Optional }
 
 import sbt.internal.inc.classpath.{ ClassLoaderCache, ClasspathUtilities }
-import sbt.internal.inc.javac.JavaTools
 import sbt.internal.scripted.{ TestFailed, StatementHandler }
 import sbt.internal.util.ManagedLogger
 import sjsonnew.support.scalajson.unsafe.{ Converter, Parser => JsonParser }

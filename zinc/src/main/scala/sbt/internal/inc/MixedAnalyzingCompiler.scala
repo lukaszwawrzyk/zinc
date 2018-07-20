@@ -113,8 +113,8 @@ final class MixedAnalyzingCompiler(
                 Files.copy(outputJar.toPath, tmpJar.toPath)
               }
               javac { originalCp: Seq[File] =>
-                (if (outputJar.exists()) Seq(tmpJar) else Nil) ++ originalCp.filterNot(
-                  _ == outputJar)
+                val tmpJarSeq = if (outputJar.exists()) Seq(tmpJar) else Nil
+                tmpJarSeq ++ originalCp.filterNot(_ == outputJar)
               }.compile(
                 javaSrcs,
                 joptions,
@@ -317,10 +317,9 @@ object MixedAnalyzingCompiler {
     new MixedAnalyzingCompiler(
       config.compiler,
       // TODO - Construction of analyzing Java compiler MAYBE should be earlier...
-      (modClasspath: Seq[File] => Seq[File]) => {
-        val newCp = modClasspath(config.classpath)
+      (modifyClasspath: Seq[File] => Seq[File]) => {
+        val newCp = modifyClasspath(config.classpath)
         val (searchClasspath, entry) = searchClasspathAndLookup(config, newCp)
-        println(s"JAVAC RUNS WITH CP: $newCp and with search cp $searchClasspath")
         new AnalyzingJavaCompiler(
           config.javac,
           newCp,

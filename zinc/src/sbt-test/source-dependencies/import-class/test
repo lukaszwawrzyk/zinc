@@ -1,4 +1,5 @@
 > compile
+
 # remove class a.A
 $ copy-file changes/A.scala A.scala
 
