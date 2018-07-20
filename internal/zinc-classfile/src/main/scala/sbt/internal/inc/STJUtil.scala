@@ -94,7 +94,8 @@ object STJUtil {
 
   def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
-  def init(jar: File, cls: String): String = jar + "!" + (if (isWindows) cls.replace("/", "\\") else cls)
+  def init(jar: File, cls: String): String =
+    jar + "!" + (if (isWindows) cls.replace("/", "\\") else cls)
 
   def fromUrl(u: URL): String = {
     val Array(jarUri, cls) = u.toString.split("!")
