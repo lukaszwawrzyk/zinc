@@ -81,7 +81,7 @@ final class MixedAnalyzingCompiler(
               sources.toArray,
               changes,
               arguments.toArray,
-              CompileOutput(outputOverride),
+              outputOverride,
               callback,
               config.reporter,
               config.cache,
