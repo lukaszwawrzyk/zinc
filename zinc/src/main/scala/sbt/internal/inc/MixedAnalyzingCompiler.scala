@@ -52,8 +52,8 @@ final class MixedAnalyzingCompiler(
       callback: XAnalysisCallback,
       classfileManager: XClassFileManager
   ): Unit = {
-    val out = config.currentSetup.output
-    val outputDirs = outputDirectories(out)
+    val output = config.currentSetup.output
+    val outputDirs = outputDirectories(output)
     outputDirs.foreach { d =>
       if (d.getName.endsWith(".jar"))
         IO.createDirectory(d.getParentFile)
@@ -69,8 +69,8 @@ final class MixedAnalyzingCompiler(
     /** Compile Scala sources. */
     def compileScala(): Unit =
       if (scalaSrcs.nonEmpty) {
-        STJ.touchOutputFile(out, "befor compile scala")
-        STJ.withPreviousJar(out) { (extraClasspath, outputOverride) =>
+        STJ.touchOutputFile(output, "befor compile scala")
+        STJ.withPreviousJar(output) { extraClasspath =>
           val sources = if (config.currentSetup.order == Mixed) incSrc else scalaSrcs
           val arguments = cArgs(Nil,
                                 toAbsolute(extraClasspath) ++ absClasspath,
@@ -81,7 +81,7 @@ final class MixedAnalyzingCompiler(
               sources.toArray,
               changes,
               arguments.toArray,
-              outputOverride,
+              output,
               callback,
               config.reporter,
               config.cache,
@@ -90,7 +90,7 @@ final class MixedAnalyzingCompiler(
             )
           }
         }
-        STJ.touchOutputFile(out, "after compile scala")
+        STJ.touchOutputFile(output, "after compile scala")
       }
 
     /** Compile java and run analysis. */
@@ -104,7 +104,7 @@ final class MixedAnalyzingCompiler(
             )
           val joptions = config.currentSetup.options.javacOptions
 
-          STJ.extractJarOutput(out) match {
+          STJ.extractJarOutput(output) match {
             case Some(outputJar) =>
               val outputDir = CompileOutput(outputJar.getParentFile)
               val tmpJar =
@@ -129,7 +129,7 @@ final class MixedAnalyzingCompiler(
               javac(identity).compile(
                 javaSrcs,
                 joptions,
-                out,
+                output,
                 callback,
                 incToolOptions,
                 config.reporter,
@@ -137,7 +137,7 @@ final class MixedAnalyzingCompiler(
                 config.progress
               )
           }
-          STJ.touchOutputFile(out, "Aftor compile Jawa")
+          STJ.touchOutputFile(output, "Aftor compile Jawa")
         }
       }
     }
