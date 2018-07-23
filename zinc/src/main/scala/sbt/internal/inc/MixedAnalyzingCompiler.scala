@@ -12,7 +12,7 @@ package inc
 import java.io.File
 import java.lang.ref.{ SoftReference, Reference }
 import java.nio.file.{ Files, StandardCopyOption }
-import java.util.{ UUID, Optional }
+import java.util.Optional
 
 import inc.javac.AnalyzingJavaCompiler
 import xsbti.{ Reporter, AnalysisCallback => XAnalysisCallback }
@@ -149,7 +149,7 @@ final class MixedAnalyzingCompiler(
                                StandardCopyOption.COPY_ATTRIBUTES)
                 }
               }
-              outputDir.delete()
+              IO.delete(outputDir)
             case None =>
               javac(identity).compile(
                 javaSrcs,

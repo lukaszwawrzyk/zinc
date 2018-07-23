@@ -30,8 +30,6 @@ import scala.util.{ Random, Try }
 
 private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options: IncOptions) {
 
-  import STJ.pause
-
   // setting the related system property to true will skip checking that the class name
   // still comes from the same classpath entry.  This can workaround bugs in classpath construction,
   // such as the currently problematic -javabootclasspath.  This is subject to removal at any time.
@@ -118,9 +116,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
                                      classfileManager: XClassFileManager): (Analysis, Set[File]) = {
     val invalidatedSources = classes.flatMap(previous.relations.definesClass) ++ modifiedSrcs
     val invalidatedSourcesForCompilation = expand(invalidatedSources, allSources)
-    pause("Before prune")
     val pruned = Incremental.prune(invalidatedSourcesForCompilation, previous, classfileManager)
-    pause("After prune")
     debugInnerSection("Pruned")(pruned.relations)
 
     val fresh = doCompile(invalidatedSourcesForCompilation, binaryChanges)

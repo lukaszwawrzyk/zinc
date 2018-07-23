@@ -59,8 +59,7 @@ object STJ {
 
   // useful for debuging files
   def pause(msg: String): Unit = {
-//    scala.io.StdIn.readLine(s)
-    println(msg)
+    Console.readLine(msg)
   }
 
   def listFiles(f: File): Seq[String] = {
