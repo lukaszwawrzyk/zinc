@@ -69,7 +69,6 @@ final class MixedAnalyzingCompiler(
     /** Compile Scala sources. */
     def compileScala(): Unit =
       if (scalaSrcs.nonEmpty) {
-        STJ.touchOutputFile(output, "befor compile scala")
         STJ.withPreviousJar(output) { extraClasspath =>
           val sources = if (config.currentSetup.order == Mixed) incSrc else scalaSrcs
           val arguments = cArgs(Nil,
@@ -90,7 +89,6 @@ final class MixedAnalyzingCompiler(
             )
           }
         }
-        STJ.touchOutputFile(output, "after compile scala")
       }
 
     /** Compile java and run analysis. */
@@ -161,7 +159,6 @@ final class MixedAnalyzingCompiler(
                 config.progress
               )
           }
-          STJ.touchOutputFile(output, "Aftor compile Jawa")
         }
       }
     }

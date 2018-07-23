@@ -45,12 +45,11 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
     import config._
     import setup._
     val output = CompileOutput(classesDirectory)
-    STJ.touchOutputFile(output, "befor compilation completely")
     val compilers = in.compilers
     val javacChosen = compilers.javaTools.javac
     val scalac = compilers.scalac
     val extraOptions = extra.toList.map(_.toScalaTuple)
-    val res = compileIncrementally(
+    compileIncrementally(
       scalac,
       javacChosen,
       sources,
@@ -69,8 +68,6 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
       incrementalCompilerOptions,
       extraOptions
     )(logger)
-    STJ.touchOutputFile(output, "after compilation completely")
-    res
   }
 
   /**
