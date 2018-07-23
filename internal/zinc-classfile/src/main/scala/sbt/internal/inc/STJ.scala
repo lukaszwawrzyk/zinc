@@ -224,10 +224,8 @@ object STJ {
         }
 
         if (prevJar.exists() && outputJar.exists()) {
-          val prevJarCopy = tmpJar(prevJar, "prevcopy")
-          Files.copy(prevJar.toPath, prevJarCopy.toPath)
-          STJ.mergeJars(into = prevJarCopy, from = outputJar)
-          IO.move(prevJarCopy, outputJar)
+          STJ.mergeJars(into = prevJar, from = outputJar)
+          IO.move(prevJar, outputJar)
         }
         res
       }
