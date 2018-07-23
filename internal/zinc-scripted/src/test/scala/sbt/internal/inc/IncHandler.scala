@@ -404,7 +404,7 @@ case class ProjectStructure(
     val output = outputJar.getOrElse(classesDir)
     val classpath = (i.si.allJars.toList ++ (unmanagedJars :+ output) ++ internalClasspath).toArray
     val extraOptions =
-      if (useStraightToJar) Array("-Dscala.classpath.closeZip=true", "-YdisableFlatCpCaching")
+      if (useStraightToJar) Array("-YdisableFlatCpCaching")
       else Array.empty[String]
     val in = compiler.inputs(
       classpath,
