@@ -1,8 +1,7 @@
 package sbt.internal.inc
 
 import java.io.File
-import java.net.{ URL, URI }
-import java.nio.file.{ Files, FileSystem }
+import java.nio.file.{ Files, Paths }
 
 import sbt.internal.scripted.FileCommands
 import sbt.io.IO
@@ -28,37 +27,44 @@ class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) 
   }
 
   override def absent(paths: List[String]): Unit = {
-    val (jared, regular) = paths.partition(_.startsWith("jar:file"))
-    val jaredPresent = jared.exists(existsInJar)
-    val present = fromStrings(regular).filter(_.exists)
-    if (present.nonEmpty || jaredPresent)
+    val present = paths.filter(exists)
+    if (present.nonEmpty)
       scriptError("File(s) existed: " + present.mkString("[ ", " , ", " ]"))
   }
 
   override def newer(a: String, b: String): Unit = {
-    val pathA = fromString(a)
-    val pathB = fromString(b)
-    val isNewer = pathA.exists &&
-      (!pathB.exists || IO.getModifiedTimeOrZero(pathA) > IO.getModifiedTimeOrZero(pathB))
+    val isNewer = exists(a) && (!exists(b) || getModifiedTimeOrZero(a) > getModifiedTimeOrZero(b))
     if (!isNewer) {
-      scriptError(s"$pathA is not newer than $pathB")
+      scriptError(s"$a is not newer than $b")
     }
   }
 
   override def exists(paths: List[String]): Unit = {
-    val (jars, regular) = paths.partition(_.startsWith("jar:file"))
-    val jaredNotPresent = !jars.forall(existsInJar)
-    val notPresent = fromStrings(regular).filter(!_.exists)
-    if (notPresent.nonEmpty || jaredNotPresent)
+    val notPresent = paths.filter(!exists(_))
+    if (notPresent.nonEmpty) {
       scriptError("File(s) did not exist: " + notPresent.mkString("[ ", " , ", " ]"))
+    }
   }
 
-  def existsInJar(url: String): Boolean = {
-    val Array(jarPath, filePath) = url.stripPrefix("jar:file:").split("!")
-    val absJarPath = new File(baseDirectory, jarPath)
-    STJ.withZipFs(absJarPath) { fs =>
-      Files.exists(fs.getPath(filePath))
+  private def exists(path: String): Boolean = {
+    pathFold(path)(_.exists(), STJ.existsInJar)(_ || _)
+  }
+
+  private def getModifiedTimeOrZero(path: String): Long = {
+    pathFold(path)(IO.getModifiedTimeOrZero, STJ.readModifiedTimeFromJar)(_ max _)
+  }
+
+  private def pathFold[A](path: String)(regular: File => A, jared: STJ.JaredClass => A)(
+      combine: (A, A) => A): A = {
+    val jaredRes = {
+      val relBasePath = "target/classes"
+      IO.relativize(new File(relBasePath), new File(path)).map { relClass =>
+        val jar = Paths.get(baseDirectory.toString, relBasePath, "output.jar").toFile
+        jared(STJ.init(jar, relClass))
+      }
     }
+    val regularRes = regular(fromString(path))
+    jaredRes.map(combine(_, regularRes)).getOrElse(regularRes)
   }
 
 }

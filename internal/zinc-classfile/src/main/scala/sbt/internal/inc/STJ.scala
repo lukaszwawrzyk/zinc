@@ -169,10 +169,9 @@ object STJ {
     }
   }
 
-  private def readModifiedTimeFromJar(jc: JaredClass): Long = {
+  def readModifiedTimeFromJar(jc: JaredClass): Long = {
     val (jar, cls) = toJarAndRelClass(jc)
     if (jar.exists()) {
-      // OPENS OUTPUT.JAR !!! (when collecting initial stamps)
       val file = new ZipFile(jar, ZipFile.OPEN_READ)
       val time = Option(file.getEntry(cls)).map(_.getLastModifiedTime.toMillis).getOrElse(0L)
       file.close()
