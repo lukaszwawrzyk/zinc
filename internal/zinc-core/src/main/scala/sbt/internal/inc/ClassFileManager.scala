@@ -126,16 +126,18 @@ object ClassFileManager {
             def newTmpJar =
               STJ.fileToJarUri(new File(tempDir, UUID.randomUUID.toString + ".jar"))
             val targetJar = realToTmpJars.getOrElse(jar, newTmpJar)
-            for (c <- classes) {
-              movedJaredClasses.put(STJ.fromJarUriAndRelClass(jar, c), targetJar)
+            if (classes.nonEmpty) {
               STJ.withZipFs(jar, create = false) { srcFs =>
                 STJ.withZipFs(targetJar, create = true) { dstFs =>
-                  val src = srcFs.getPath(c)
-                  val dst = dstFs.getPath(c)
-                  if (!Files.isDirectory(src)) {
-                    Option(dst.getParent).foreach(Files.createDirectories(_))
+                  for (c <- classes) {
+                    movedJaredClasses.put(STJ.fromJarUriAndRelClass(jar, c), targetJar)
+                    val src = srcFs.getPath(c)
+                    val dst = dstFs.getPath(c)
+                    if (!Files.isDirectory(src)) {
+                      Option(dst.getParent).foreach(Files.createDirectories(_))
+                    }
+                    Files.copy(src, dst, StandardCopyOption.COPY_ATTRIBUTES)
                   }
-                  Files.copy(src, dst, StandardCopyOption.COPY_ATTRIBUTES)
                 }
               }
             }
