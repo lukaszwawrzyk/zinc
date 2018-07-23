@@ -129,10 +129,8 @@ final class MixedAnalyzingCompiler(
 
               import sbt.io.syntax._
               val classes = (outputDir ** -DirectoryFilter).get.flatMap { classFile =>
-                println(s"Processing $classFile")
                 IO.relativize(outputDir, classFile) match {
                   case Some(relPath) =>
-                    println(s"Rel path is $relPath")
                     List((classFile, relPath))
                   case _ => Nil
                 }
