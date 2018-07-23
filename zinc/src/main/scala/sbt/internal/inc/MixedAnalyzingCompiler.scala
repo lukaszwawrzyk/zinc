@@ -142,7 +142,7 @@ final class MixedAnalyzingCompiler(
                 classes.foreach {
                   case (classFile, target) =>
                     val targetPath = fs.getPath(target)
-                    Files.createDirectories(targetPath.getParent)
+                    Option(targetPath.getParent).foreach(Files.createDirectories(_))
                     Files.copy(classFile.toPath,
                                targetPath,
                                StandardCopyOption.REPLACE_EXISTING,

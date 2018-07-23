@@ -133,7 +133,7 @@ object ClassFileManager {
                   val src = srcFs.getPath(c)
                   val dst = dstFs.getPath(c)
                   if (!Files.isDirectory(src)) {
-                    Files.createDirectories(dst.getParent)
+                    Option(dst.getParent).foreach(Files.createDirectories(_))
                   }
                   Files.copy(src, dst, StandardCopyOption.COPY_ATTRIBUTES)
                 }
