@@ -94,13 +94,12 @@ object STJ {
   }
 
   def fromJarUriAndRelClass(jarUri: URI, cls: RelClass): JaredClass = {
-    val fileUri = URI.create(jarUri.toString.stripPrefix("jar:"))
-    val jar = uriToFile(fileUri)
+    val jar = jarUriToFile(jarUri)
     val relClass = cls.stripPrefix("/").stripPrefix("\\")
     init(jar, relClass)
   }
 
-  // From sbt.io.IO, correctly handles uri like: file:<even a windows path>
+  // From sbt.io.IO, correctly handles uri like: file:<a windows path>
   private[this] def uriToFile(uri: URI): File = {
     val part = uri.getSchemeSpecificPart
     // scheme might be omitted for relative URI reference.
@@ -139,17 +138,13 @@ object STJ {
     new File(jar)
   }
 
-  def jarUriToFile(jar: URI): File = {
-    val x = jar.toString.stripPrefix("jar:file:")
-    // TODO use something built in, more robust. This might fail with UNC
-    val path = if (isWindows) x.stripPrefix("/").replace("/", "\\") else x
-    new File(path)
+  def jarUriToFile(jarUri: URI): File = {
+    val fileUri = URI.create(jarUri.toString.stripPrefix("jar:"))
+    uriToFile(fileUri)
   }
 
   def fileToJarUri(jarFile: File): URI = {
-    // TODO use something built in, more robust. This might fail with UNC
-    val windowsSanitized = if (isWindows) "/" + jarFile.toString.replace("\\", "/") else jarFile
-    URI.create("jar:file:" + windowsSanitized)
+    new URI("jar:" + jarFile.toURI.toString)
   }
 
   def getModifiedTimeOrZero(file: File): Long = {
