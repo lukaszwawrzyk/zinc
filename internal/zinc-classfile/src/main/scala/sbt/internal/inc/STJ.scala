@@ -204,7 +204,7 @@ object STJ {
             .foreach(f => Try(f.delete()))
         }
 
-        val prevJar = tmpJar(outputJar, "prev")
+        val prevJar = outputJar.toPath.resolveSibling(outputJar.getName.replace(".jar", "_prev.jar")).toFile
         if (outputJar.exists()) {
           IO.move(outputJar, prevJar)
         }
