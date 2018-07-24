@@ -79,7 +79,7 @@ object STJ {
   type JaredClass = String
   type RelClass = String
 
-  def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
+  lazy val isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
   def init(jar: File, cls: RelClass): JaredClass = {
     // to ensure consistent 'slashing' as those identifies are used e.g. in maps

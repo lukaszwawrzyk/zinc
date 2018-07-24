@@ -242,7 +242,10 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         case None           => Analysis.empty
       }
 
-      STJ.extractJarOutput(output).foreach(_ => sys.props.put("scala.classpath.closeZip", "true"))
+      if (STJ.isWindows) {
+        STJ.extractJarOutput(output).foreach(_ => sys.props.put("scala.classpath.closeZip", "true"))
+        sys.props.put("sbt.io.jdktimestamps", "true")
+      }
 
       val config = MixedAnalyzingCompiler.makeConfig(
         scalaCompiler,
