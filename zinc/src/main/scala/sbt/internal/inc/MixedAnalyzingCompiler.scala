@@ -106,13 +106,8 @@ final class MixedAnalyzingCompiler(
             case Some(outputJar) =>
               val outputDir = outputJar.toPath.resolveSibling("javac-output").toFile
               IO.createDirectory(outputDir)
-              val tmpJar = STJ.tmpJar(outputJar, "forjava")
-              if (outputJar.exists()) {
-                Files.copy(outputJar.toPath, tmpJar.toPath)
-              }
               javac { originalCp: Seq[File] =>
-                val tmpJarSeq = if (outputJar.exists()) Seq(tmpJar) else Nil
-                (outputDir +: tmpJarSeq) ++ originalCp.filterNot(_ == outputJar)
+                outputDir +: outputJar +: originalCp.filterNot(_ == outputJar)
               }.compile(
                 javaSrcs,
                 joptions,
