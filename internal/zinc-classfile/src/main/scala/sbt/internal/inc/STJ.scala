@@ -10,7 +10,7 @@ import scala.collection.mutable.ListBuffer
 import java.util.function.Consumer
 import java.nio.file._
 
-import scala.util.{ Random, Try }
+import scala.util.Try
 import java.util.UUID
 
 import sbt.io.IO.FileScheme
@@ -20,13 +20,7 @@ import xsbti.compile.{ Output, SingleOutput }
 object STJ {
 
   def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
-    val env = new java.util.HashMap[String, String]
-    if (create) env.put("create", "true")
-    val fs = FileSystems.newFileSystem(uri, env)
-    try action(fs)
-    finally {
-      fs.close()
-    }
+    JavaZipOps.withZipFs(uri, create)(action)
   }
 
   def withZipFs[A](file: File, create: Boolean = false)(action: FileSystem => A): A = {
@@ -36,25 +30,7 @@ object STJ {
   // puts all files in `from` (overriding the original files in case of conflicts)
   // into `to`, removing `from`. In other words it merges `from` into `into`.
   def mergeJars(into: File, from: File): Unit = {
-    withZipFs(into) { intoFs =>
-      withZipFs(from) { fromFs =>
-        Files
-          .walk(fromFs.getPath("/"))
-          .forEachOrdered(new Consumer[Path] {
-            override def accept(t: Path): Unit = {
-              if (Files.isDirectory(t)) {
-                Files.createDirectories(intoFs.getPath(t.toString))
-              } else {
-                Files.copy(t,
-                           intoFs.getPath(t.toString),
-                           StandardCopyOption.COPY_ATTRIBUTES,
-                           StandardCopyOption.REPLACE_EXISTING)
-              }
-            }
-          })
-      }
-    }
-    from.delete()
+    Zip4jZipOps.mergeArchives(target = into.toPath, source = from.toPath)
   }
 
   // useful for debuging files
@@ -233,11 +209,7 @@ object STJ {
   def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
     val jarFile = jarUriToFile(jar)
     if (jarFile.exists()) {
-      withZipFs(jarFile) { fs =>
-        classes.foreach { cls =>
-          Files.deleteIfExists(fs.getPath(cls))
-        }
-      }
+      JavaZipOps.removeFromJar(jarFile, classes)
     }
   }
 
