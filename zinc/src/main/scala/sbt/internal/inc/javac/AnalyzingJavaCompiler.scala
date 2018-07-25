@@ -162,6 +162,7 @@ final class AnalyzingJavaCompiler private[sbt] (
           Analyze(newClasses.toSeq, srcs, log, output, finalJarOutput)(callback, loader, readAPI)
         }
       }
+      loader.close()
 
       // Report that we reached the end
       progressOpt.foreach { progress =>

@@ -20,8 +20,8 @@ object ClasspathUtilities {
   def toLoader(finder: PathFinder, parent: ClassLoader): ClassLoader =
     new URLClassLoader(finder.getURLs, parent)
 
-  def toLoader(paths: Seq[File]): ClassLoader = toLoader(paths, rootLoader)
-  def toLoader(paths: Seq[File], parent: ClassLoader): ClassLoader =
+  def toLoader(paths: Seq[File]): URLClassLoader = toLoader(paths, rootLoader)
+  def toLoader(paths: Seq[File], parent: ClassLoader): URLClassLoader =
     new URLClassLoader(Path.toURLs(paths), parent)
 
   def toLoader(paths: Seq[File],

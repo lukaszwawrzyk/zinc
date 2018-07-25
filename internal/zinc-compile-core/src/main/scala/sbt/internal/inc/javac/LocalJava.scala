@@ -153,7 +153,6 @@ final class LocalJavaCompiler(compiler: javax.tools.JavaCompiler) extends XJavaC
                  null,
                  jfiles)
         .call()
-      customizedFileManager.close()
 
       /* Double check success variables for the Java compiler.
        * The local compiler may report successful compilations even though
