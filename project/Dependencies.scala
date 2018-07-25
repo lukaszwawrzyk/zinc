@@ -80,6 +80,7 @@ object Dependencies {
   val scalaCheck = "org.scalacheck" %% "scalacheck" % "1.14.0"
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.5"
   val junit = "junit" % "junit" % "4.11"
+  val zip4j = "net.lingala.zip4j" % "zip4j" % "1.3.2"
   val sjsonnew = Def.setting {
     "com.eed3si9n" %% "sjson-new-core" % contrabandSjsonNewVersion.value
   }

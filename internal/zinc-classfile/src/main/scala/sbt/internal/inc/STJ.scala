@@ -10,7 +10,7 @@ import scala.collection.mutable.ListBuffer
 import java.util.function.Consumer
 import java.nio.file._
 
-import scala.util.{ Random, Try }
+import scala.util.Try
 import java.util.UUID
 
 import sbt.io.IO.FileScheme
@@ -36,25 +36,7 @@ object STJ {
   // puts all files in `from` (overriding the original files in case of conflicts)
   // into `to`, removing `from`. In other words it merges `from` into `into`.
   def mergeJars(into: File, from: File): Unit = {
-    withZipFs(into) { intoFs =>
-      withZipFs(from) { fromFs =>
-        Files
-          .walk(fromFs.getPath("/"))
-          .forEachOrdered(new Consumer[Path] {
-            override def accept(t: Path): Unit = {
-              if (Files.isDirectory(t)) {
-                Files.createDirectories(intoFs.getPath(t.toString))
-              } else {
-                Files.copy(t,
-                           intoFs.getPath(t.toString),
-                           StandardCopyOption.COPY_ATTRIBUTES,
-                           StandardCopyOption.REPLACE_EXISTING)
-              }
-            }
-          })
-      }
-    }
-    from.delete()
+    Zip4jZipOps.mergeArchives(target = into.toPath, source = from.toPath)
   }
 
   // useful for debuging files
@@ -204,7 +186,8 @@ object STJ {
             .foreach(f => Try(f.delete()))
         }
 
-        val prevJar = outputJar.toPath.resolveSibling(outputJar.getName.replace(".jar", "_prev.jar")).toFile
+        val prevJar =
+          outputJar.toPath.resolveSibling(outputJar.getName.replace(".jar", "_prev.jar")).toFile
         if (outputJar.exists()) {
           IO.move(outputJar, prevJar)
         }
