@@ -5,13 +5,14 @@ package classfile
 
 import java.io.File
 import java.net.URLClassLoader
-import javax.tools.{ StandardLocation, ToolProvider }
 
+import javax.tools.{ ToolProvider, StandardLocation }
 import sbt.io.IO
 import sbt.internal.util.ConsoleLogger
 import xsbti.api.DependencyContext._
 import xsbti.{ AnalysisCallback, TestCallback }
 import xsbti.TestCallback.ExtractedClassDependencies
+import xsbti.compile.SingleOutput
 
 import scala.collection.JavaConverters._
 
@@ -61,9 +62,15 @@ object JavaCompilerForUnitTesting {
       // - extract api representation out of Class (and saved it via a side effect)
       // - extract all base classes.
       // we extract just parents as this is enough for testing
-      Analyze(classFiles, srcFiles, logger)(analysisCallback,
-                                            classloader,
-                                            readAPI(analysisCallback, _, _))
+
+      val output = new SingleOutput {
+        def getOutputDirectory = classesDir
+        override def toString = s"SingleOutput($getOutputDirectory)"
+      }
+      Analyze(classFiles, srcFiles, logger, output, finalJarOutput = None)(
+        analysisCallback,
+        classloader,
+        readAPI(analysisCallback, _, _))
       (srcFiles, analysisCallback)
     }
   }
