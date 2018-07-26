@@ -196,7 +196,7 @@ object ClassFileManager {
     }
 
     private def show(a: String): Unit = {
-      println("~~[CFM] " + a)
+      logger.debug(a)
     }
   }
 
