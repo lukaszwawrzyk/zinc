@@ -404,8 +404,11 @@ case class ProjectStructure(
     val output = outputJar.getOrElse(classesDir)
     val classpath = (i.si.allJars.toList ++ (unmanagedJars :+ output) ++ internalClasspath).toArray
     val extraOptions =
-      if (useStraightToJar) Array("-YdisableFlatCpCaching")
-      else Array.empty[String]
+      if (useStraightToJar && i.si.version.split('.')(1).toInt > 10) {
+        Array("-YdisableFlatCpCaching")
+      } else {
+        Array.empty[String]
+      }
     val in = compiler.inputs(
       classpath,
       sources.toArray,
