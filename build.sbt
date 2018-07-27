@@ -601,7 +601,7 @@ addCommandAlias(
 )
 
 lazy val otherRootSettings = Seq(
-  Scripted.scriptedBufferLog := true,
+  Scripted.scriptedBufferLog := false,
   Scripted.scriptedPrescripted := { addSbtAlternateResolver _ },
   Scripted.scripted := scriptedTask.evaluated,
   Scripted.scriptedUnpublished := scriptedUnpublishedTask.evaluated,
