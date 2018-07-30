@@ -130,8 +130,9 @@ private[sbt] object Analyze {
                 analysis.classDependency(scalaLikeTypeName, fromClassName, context)
               } else {
                 val cachedOrigin = classfilesCache.get(onBinaryName)
-                for (file <- cachedOrigin.orElse(loadFromClassloader()))
-                  analysis.binaryDependency(file, onBinaryName, fromClassName, source, context)
+                for (file <- cachedOrigin.orElse(loadFromClassloader())) {
+                  analysis.binaryDependency(STJ.fromJavacOutputDir(file).getOrElse(file), onBinaryName, fromClassName, source, context)
+                }
               }
             }
           case None => // It could be a stale class file, ignore

@@ -239,11 +239,7 @@ private[inc] abstract class IncrementalCommon(val log: sbt.util.Logger, options:
 
     val removedProducts = lookup.removedProducts(previousAnalysis).getOrElse {
       previous.allProducts
-        .filter(p => {
-          val res = !equivS.equiv(previous.product(p), current.product(p))
-          println(s"comparing for $p ${previous.product(p)} and ${current.product(p)} = ${!res}")
-          res
-        })
+        .filter(p => !equivS.equiv(previous.product(p), current.product(p)))
         .toSet
     }
 
