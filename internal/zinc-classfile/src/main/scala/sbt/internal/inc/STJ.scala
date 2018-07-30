@@ -204,7 +204,8 @@ object STJ {
             .foreach(f => Try(f.delete()))
         }
 
-        val prevJar = outputJar.toPath.resolveSibling(outputJar.getName.replace(".jar", "_prev.jar")).toFile
+        val prevJar =
+          outputJar.toPath.resolveSibling(outputJar.getName.replace(".jar", "_prev.jar")).toFile
         if (outputJar.exists()) {
           IO.move(outputJar, prevJar)
         }
@@ -250,6 +251,30 @@ object STJ {
       case _ => None
     }
 
+  }
+
+  private val javacOutputPrefix = "javac-output-"
+  def javacOutputDir(outputJar: File): File = {
+    val outJarName = outputJar.getName
+    val outDirName = javacOutputPrefix + outJarName
+    outputJar.toPath.resolveSibling(outDirName).toFile
+  }
+
+  def fromJavacOutputDir(file: File): Option[File] = {
+    import scala.collection.JavaConverters._
+    val path = file.toPath
+    val javacOutputDirComponent = path.asScala.zipWithIndex.find {
+      case (component, _) =>
+        component.toString.startsWith(javacOutputPrefix)
+    }
+    javacOutputDirComponent map {
+      case (component, index) =>
+        val outputJarName = component.toString.stripPrefix(javacOutputPrefix)
+        val basePath = Stream.iterate(path, path.getNameCount - index + 1)(_.getParent).last
+        val outputJarPath = basePath.resolve(outputJarName)
+        val relClass = path.subpath(index + 1, path.getNameCount)
+        new File(init(outputJarPath.toFile, relClass.toString))
+    }
   }
 
   // for debugging purposes, fails if file is currently open

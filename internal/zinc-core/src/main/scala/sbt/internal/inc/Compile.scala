@@ -222,7 +222,7 @@ private final class AnalysisCallback(
         // dependency is a product of a source not included in this compilation
         classDependency(dependsOn, fromClassName, context)
       case None =>
-        classToSource.get(classFile) match {
+        classToSource.get(STJ.fromJavacOutputDir(classFile).getOrElse(classFile)) match {
           case Some(dependsOn) =>
             // dependency is a product of a source in this compilation step,
             //  but not in the same compiler run (as in javac v. scalac)

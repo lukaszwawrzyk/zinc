@@ -104,7 +104,7 @@ final class MixedAnalyzingCompiler(
 
           STJ.extractJarOutput(output) match {
             case Some(outputJar) =>
-              val outputDir = outputJar.toPath.resolveSibling("javac-output").toFile
+              val outputDir = STJ.javacOutputDir(outputJar)
               IO.createDirectory(outputDir)
               val tmpJar = STJ.tmpJar(outputJar, "forjava")
               if (outputJar.exists()) {
