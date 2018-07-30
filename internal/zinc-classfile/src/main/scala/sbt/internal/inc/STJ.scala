@@ -253,10 +253,10 @@ object STJ {
 
   }
 
-  private val javacOutputPrefix = "javac-output-"
+  private val javacOutputSuffix = "-javac-output"
   def javacOutputDir(outputJar: File): File = {
     val outJarName = outputJar.getName
-    val outDirName = javacOutputPrefix + outJarName
+    val outDirName = outJarName + javacOutputSuffix
     outputJar.toPath.resolveSibling(outDirName).toFile
   }
 
@@ -265,11 +265,11 @@ object STJ {
     val path = file.toPath
     val javacOutputDirComponent = path.asScala.zipWithIndex.find {
       case (component, _) =>
-        component.toString.startsWith(javacOutputPrefix)
+        component.toString.endsWith(javacOutputSuffix)
     }
     javacOutputDirComponent map {
       case (component, index) =>
-        val outputJarName = component.toString.stripPrefix(javacOutputPrefix)
+        val outputJarName = component.toString.stripSuffix(javacOutputSuffix)
         val basePath = Stream.iterate(path, path.getNameCount - index + 1)(_.getParent).last
         val outputJarPath = basePath.resolve(outputJarName)
         val relClass = path.subpath(index + 1, path.getNameCount)
