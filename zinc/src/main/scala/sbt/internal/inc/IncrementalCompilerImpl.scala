@@ -242,8 +242,18 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         case None           => Analysis.empty
       }
 
-      STJ.extractJarOutput(output).foreach(_ => sys.props.put("scala.classpath.closeZip", "true"))
+      val jarOutput = STJ.extractJarOutput(output)
+      jarOutput.foreach(_ => sys.props.put("scala.classpath.closeZip", "true"))
       sys.props.put("sbt.io.jdktimestamps", "true")
+
+      val extraOptions = {
+        val scalaMinor = scalaCompiler.scalaInstance.version.split('.')(1).toInt
+        if (jarOutput.isDefined && scalaMinor > 10) {
+          Seq("-YdisableFlatCpCaching")
+        } else {
+          Seq.empty
+        }
+      }
 
       val config = MixedAnalyzingCompiler.makeConfig(
         scalaCompiler,
@@ -253,7 +263,7 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         output,
         cache,
         progress,
-        scalaOptions,
+        scalaOptions ++ extraOptions,
         javaOptions,
         prev,
         previousSetup,
