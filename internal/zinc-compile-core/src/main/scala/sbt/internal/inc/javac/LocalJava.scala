@@ -126,8 +126,6 @@ final class LocalJavaCompiler(compiler: javax.tools.JavaCompiler) extends XJavaC
     val logWriter = new PrintWriter(logger)
     log.debug("Attempting to call " + compiler + " directly...")
     val diagnostics = new DiagnosticsReporter(reporter)
-    val fileManager = compiler.getStandardFileManager(diagnostics, null, null)
-    val jfiles = fileManager.getJavaFileObjectsFromFiles(sources.toList.asJava)
 
     /* Local Java compiler doesn't accept `-J<flag>` options, strip them. */
     val (invalidOptions, cleanedOptions) = options partition (_ startsWith "-J")
@@ -136,6 +134,34 @@ final class LocalJavaCompiler(compiler: javax.tools.JavaCompiler) extends XJavaC
       log.warn(invalidOptions.mkString("\t", ", ", ""))
     }
 
+    val fileManager = {
+      val cl = compiler.getClass.getClassLoader
+      val contextClass = Class.forName("com.sun.tools.javac.util.Context", true, cl)
+      val optionsClass = Class.forName("com.sun.tools.javac.util.Options", true, cl)
+      val javacFileManagerClass =
+        Class.forName("com.sun.tools.javac.file.JavacFileManager", true, cl)
+      val `Options.instance` = optionsClass.getMethod("instance", contextClass)
+      val `context.put` = contextClass.getMethod("put", classOf[Class[_]], classOf[Object])
+      val `options.put` = optionsClass.getMethod("put", classOf[String], classOf[String])
+//      val `Log.logKey` = Class.forName("com.sun.tools.javac.util.Log").getDeclaredField("logKey")
+      val `new JavacFileManager` = javacFileManagerClass.getConstructor(
+        contextClass,
+        classOf[Boolean],
+        classOf[java.nio.charset.Charset])
+
+      val context = contextClass.newInstance().asInstanceOf[AnyRef]
+      `context.put`.invoke(context, classOf[java.util.Locale], null)
+      `context.put`.invoke(context, classOf[javax.tools.DiagnosticListener[_]], diagnostics)
+//      `context.put`.invoke(context, `Log.logKey`.get(null), new PrintWriter(System.err, true))
+      val options = `Options.instance`.invoke(null, context)
+      `options.put`.invoke(options, "useOptimizedZip", "false")
+
+      `new JavacFileManager`
+        .newInstance(context, Boolean.box(true), null)
+        .asInstanceOf[javax.tools.StandardJavaFileManager]
+    }
+
+    val jfiles = fileManager.getJavaFileObjectsFromFiles(sources.toList.asJava)
     val customizedFileManager = {
       val maybeClassFileManager = incToolOptions.classFileManager()
       if (incToolOptions.useCustomizedFileManager && maybeClassFileManager.isPresent)

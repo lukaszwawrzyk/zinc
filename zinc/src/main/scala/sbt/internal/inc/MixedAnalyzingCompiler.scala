@@ -14,7 +14,7 @@ import java.lang.ref.{ SoftReference, Reference }
 import java.nio.file.{ Files, StandardCopyOption }
 import java.util.Optional
 
-import inc.javac.AnalyzingJavaCompiler
+import inc.javac.{ AnalyzingJavaCompiler, JavaCompiler }
 import xsbti.{ Reporter, AnalysisCallback => XAnalysisCallback }
 import xsbti.compile.CompileOrder._
 import xsbti.compile._
@@ -106,14 +106,10 @@ final class MixedAnalyzingCompiler(
             case Some(outputJar) =>
               val outputDir = STJ.javacOutputDir(outputJar)
               IO.createDirectory(outputDir)
-              val tmpJar = STJ.tmpJar(outputJar, "forjava")
-              if (outputJar.exists()) {
-                Files.copy(outputJar.toPath, tmpJar.toPath)
+              val compiler = javac { originalCp: Seq[File] =>
+                outputDir +: originalCp
               }
-              javac { originalCp: Seq[File] =>
-                val tmpJarSeq = if (outputJar.exists()) Seq(tmpJar) else Nil
-                (outputDir +: tmpJarSeq) ++ originalCp.filterNot(_ == outputJar)
-              }.compile(
+              compiler.compile(
                 javaSrcs,
                 joptions,
                 CompileOutput(outputDir),
