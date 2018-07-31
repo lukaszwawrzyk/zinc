@@ -131,7 +131,11 @@ private[sbt] object Analyze {
               } else {
                 val cachedOrigin = classfilesCache.get(onBinaryName)
                 for (file <- cachedOrigin.orElse(loadFromClassloader())) {
-                  analysis.binaryDependency(STJ.fromJavacOutputDir(file).getOrElse(file), onBinaryName, fromClassName, source, context)
+                  analysis.binaryDependency(STJ.fromJavacOutputDir(file).getOrElse(file),
+                                            onBinaryName,
+                                            fromClassName,
+                                            source,
+                                            context)
                 }
               }
             }
