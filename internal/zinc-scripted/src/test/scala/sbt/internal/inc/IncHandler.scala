@@ -31,7 +31,7 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier.{ isStatic, isPublic }
 import java.util.{ Properties, Optional }
 
-import sbt.internal.inc.classpath.{ ClassLoaderCache, ClasspathUtilities }
+import sbt.internal.inc.classpath.{ ClassLoaderCache, ClasspathUtilities, ClasspathFilter }
 import sbt.internal.scripted.{ TestFailed, StatementHandler }
 import sbt.internal.util.ManagedLogger
 import sjsonnew.support.scalajson.unsafe.{ Converter, Parser => JsonParser }
@@ -174,7 +174,9 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
               val main = p.getMainMethod(mainClassName, loader)
               p.invokeMain(loader, main, params)
             } finally {
-              loader.close()
+              loader match {
+                case f: ClasspathFilter => f.close()
+              }
             }
           case s =>
             throw new TestFailed(s"Found more than one main class: $s")
