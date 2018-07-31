@@ -235,7 +235,7 @@ object STJ {
     if (jarFile.exists()) {
       withZipFs(jarFile) { fs =>
         classes.foreach { cls =>
-          Files.delete(fs.getPath(cls))
+          Files.deleteIfExists(fs.getPath(cls))
         }
       }
     }
