@@ -173,13 +173,6 @@ object STJ {
   def withPreviousJar[A](output: Output)(compile: /*extra cp: */ Seq[File] => A): A = {
     extractJarOutput(output)
       .map { outputJar =>
-        // cleanup stuff from other compilations
-        Option(outputJar.toPath.getParent.toFile.listFiles()).foreach { files =>
-          files
-            .filter(f => isTmpJar(f))
-            .foreach(f => Try(f.delete()))
-        }
-
         val prevJar =
           outputJar.toPath.resolveSibling(outputJar.getName.replace(".jar", "_prev.jar")).toFile
         if (outputJar.exists()) {
@@ -269,15 +262,6 @@ object STJ {
         println(s"$$$$$$ !!! $msg")
       }
     }
-  }
-
-  val tmpJarPrefix = "tmpjar"
-  def tmpJar(file: File, id: String): File = {
-    file.toPath.resolveSibling(s"$tmpJarPrefix$id${UUID.randomUUID()}.jar").toFile
-  }
-
-  private def isTmpJar[A](f: File) = {
-    f.getName.endsWith(".jar") && f.getName.startsWith(tmpJarPrefix)
   }
 
 }

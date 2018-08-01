@@ -39,7 +39,6 @@ private[sbt] object Parser {
       new BufferedInputStream(urlConnection.getInputStream())
   })
 
-
   private def parse(readableName: String)(is: InputStream): Either[String, ClassFile] =
     Right(parseImpl(readableName, is))
   private def parseImpl(readableName: String, is: InputStream): ClassFile = {
