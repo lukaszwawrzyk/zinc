@@ -143,10 +143,12 @@ object STJ {
   def readModifiedTimeFromJar(jc: JaredClass): Long = {
     val (jar, cls) = toJarAndRelClass(jc)
     if (jar.exists()) {
-      val file = new ZipFile(jar, ZipFile.OPEN_READ)
-      val time = Option(file.getEntry(cls)).map(_.getLastModifiedTime.toMillis).getOrElse(0L)
-      file.close()
-      time
+      withZipFs(jar) { fs =>
+        val path = fs.getPath(cls)
+        if (Files.exists(path)) {
+          Files.getLastModifiedTime(path).toMillis
+        } else 0
+      }
     } else 0
   }
 
