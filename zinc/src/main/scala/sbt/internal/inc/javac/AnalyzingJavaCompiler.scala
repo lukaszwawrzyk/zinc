@@ -11,6 +11,7 @@ package inc
 package javac
 
 import java.io.File
+import java.net.URLClassLoader
 
 import sbt.internal.inc.classfile.Analyze
 import sbt.internal.inc.classpath.ClasspathUtilities
@@ -161,6 +162,11 @@ final class AnalyzingJavaCompiler private[sbt] (
           val newClasses = Set(classesFinder.get: _*) -- oldClasses
           Analyze(newClasses.toSeq, srcs, log, output, finalJarOutput)(callback, loader, readAPI)
         }
+      }
+
+      loader match {
+        case u: URLClassLoader => u.close()
+        case _ => ()
       }
 
       // Report that we reached the end
