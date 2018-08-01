@@ -242,18 +242,24 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         case None           => Analysis.empty
       }
 
-      val jarOutput = STJ.extractJarOutput(output)
-      jarOutput.foreach(_ => sys.props.put("scala.classpath.closeZip", "true"))
       sys.props.put("sbt.io.jdktimestamps", "true")
 
-      val extraOptions = {
-        val scalaMinor = scalaCompiler.scalaInstance.version.split('.')(1).toInt
-        if (jarOutput.isDefined && scalaMinor > 10) {
+      val compileStraightToJar = STJ.isEnabled(output)
+
+      if (compileStraightToJar) sys.props.put("scala.classpath.closeZip", "true")
+
+      val extraScalacOptions = {
+        val scalaVersion = scalaCompiler.scalaInstance.version
+        if (compileStraightToJar && scalaVersion.startsWith("2.12")) {
           Seq("-YdisableFlatCpCaching")
         } else {
           Seq.empty
         }
       }
+
+      val extraJavacOptions = if (compileStraightToJar) {
+        Seq("-XDuseOptimizedZip=false")
+      } else Seq.empty
 
       val config = MixedAnalyzingCompiler.makeConfig(
         scalaCompiler,
@@ -263,8 +269,8 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         output,
         cache,
         progress,
-        scalaOptions ++ extraOptions,
-        javaOptions,
+        scalaOptions ++ extraScalacOptions,
+        javaOptions ++ extraJavacOptions,
         prev,
         previousSetup,
         perClasspathEntryLookup,

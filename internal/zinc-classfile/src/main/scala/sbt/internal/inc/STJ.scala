@@ -241,6 +241,10 @@ object STJ {
     }
   }
 
+  def isEnabled(output: Output): Boolean = {
+    extractJarOutput(output).isDefined
+  }
+
   def extractJarOutput(output: Output): Option[File] = {
     output match {
       case s: SingleOutput =>

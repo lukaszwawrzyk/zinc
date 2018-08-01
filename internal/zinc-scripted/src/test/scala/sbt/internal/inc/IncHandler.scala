@@ -410,7 +410,7 @@ case class ProjectStructure(
       sources.toArray,
       output,
       scalacOptions,
-      Array("-XDuseOptimizedZip=false"), // doesn't work, but that's the intention
+      Array(),
       maxErrors,
       Array(),
       CompileOrder.Mixed,

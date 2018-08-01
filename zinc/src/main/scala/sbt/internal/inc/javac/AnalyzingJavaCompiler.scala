@@ -166,7 +166,7 @@ final class AnalyzingJavaCompiler private[sbt] (
 
       loader match {
         case u: URLClassLoader => u.close()
-        case _ => ()
+        case _                 => ()
       }
 
       // Report that we reached the end

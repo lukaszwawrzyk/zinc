@@ -12,6 +12,9 @@ package inc
 package javac
 
 import java.io.{ File, OutputStream, PrintWriter, Writer }
+import java.nio.charset.Charset
+import java.util.Locale
+
 import javax.tools.JavaFileManager.Location
 import javax.tools.JavaFileObject.Kind
 import javax.tools.{
@@ -19,7 +22,9 @@ import javax.tools.{
   ForwardingJavaFileManager,
   ForwardingJavaFileObject,
   JavaFileManager,
-  JavaFileObject
+  JavaFileObject,
+  StandardJavaFileManager,
+  DiagnosticListener
 }
 
 import sbt.internal.util.LoggerWriter
@@ -135,30 +140,11 @@ final class LocalJavaCompiler(compiler: javax.tools.JavaCompiler) extends XJavaC
     }
 
     val fileManager = {
-      val cl = compiler.getClass.getClassLoader
-      val contextClass = Class.forName("com.sun.tools.javac.util.Context", true, cl)
-      val optionsClass = Class.forName("com.sun.tools.javac.util.Options", true, cl)
-      val javacFileManagerClass =
-        Class.forName("com.sun.tools.javac.file.JavacFileManager", true, cl)
-      val `Options.instance` = optionsClass.getMethod("instance", contextClass)
-      val `context.put` = contextClass.getMethod("put", classOf[Class[_]], classOf[Object])
-      val `options.put` = optionsClass.getMethod("put", classOf[String], classOf[String])
-//      val `Log.logKey` = Class.forName("com.sun.tools.javac.util.Log").getDeclaredField("logKey")
-      val `new JavacFileManager` = javacFileManagerClass.getConstructor(
-        contextClass,
-        classOf[Boolean],
-        classOf[java.nio.charset.Charset])
-
-      val context = contextClass.newInstance().asInstanceOf[AnyRef]
-      `context.put`.invoke(context, classOf[java.util.Locale], null)
-      `context.put`.invoke(context, classOf[javax.tools.DiagnosticListener[_]], diagnostics)
-//      `context.put`.invoke(context, `Log.logKey`.get(null), new PrintWriter(System.err, true))
-      val options = `Options.instance`.invoke(null, context)
-      `options.put`.invoke(options, "useOptimizedZip", "false")
-
-      `new JavacFileManager`
-        .newInstance(context, Boolean.box(true), null)
-        .asInstanceOf[javax.tools.StandardJavaFileManager]
+      if (cleanedOptions.contains("-XDuseOptimizedZip=false")) {
+        fileManagerWithoutOptimizedZips(diagnostics)
+      } else {
+        compiler.getStandardFileManager(diagnostics, null, null)
+      }
     }
 
     val jfiles = fileManager.getJavaFileObjectsFromFiles(sources.toList.asJava)
@@ -190,6 +176,32 @@ final class LocalJavaCompiler(compiler: javax.tools.JavaCompiler) extends XJavaC
       logger.flushLines(if (compileSuccess) Level.Warn else Level.Error)
     }
     compileSuccess
+  }
+
+  // rewrite of getStandardFileManager method that also sets the desired option
+  private def fileManagerWithoutOptimizedZips(
+      diagnostics: DiagnosticsReporter): StandardJavaFileManager = {
+    val classLoader = compiler.getClass.getClassLoader
+    val contextClass = Class.forName("com.sun.tools.javac.util.Context", true, classLoader)
+    val optionsClass = Class.forName("com.sun.tools.javac.util.Options", true, classLoader)
+    val javacFileManagerClass =
+      Class.forName("com.sun.tools.javac.file.JavacFileManager", true, classLoader)
+
+    val `Options.instance` = optionsClass.getMethod("instance", contextClass)
+    val `context.put` = contextClass.getMethod("put", classOf[Class[_]], classOf[Object])
+    val `options.put` = optionsClass.getMethod("put", classOf[String], classOf[String])
+    val `new JavacFileManager` =
+      javacFileManagerClass.getConstructor(contextClass, classOf[Boolean], classOf[Charset])
+
+    val context = contextClass.newInstance().asInstanceOf[AnyRef]
+    `context.put`.invoke(context, classOf[Locale], null)
+    `context.put`.invoke(context, classOf[DiagnosticListener[_]], diagnostics)
+    val options = `Options.instance`.invoke(null, context)
+    `options.put`.invoke(options, "useOptimizedZip", "false")
+
+    `new JavacFileManager`
+      .newInstance(context, Boolean.box(true), null)
+      .asInstanceOf[StandardJavaFileManager]
   }
 }
 
