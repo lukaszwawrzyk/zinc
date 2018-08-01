@@ -186,6 +186,7 @@ final class LocalJavaCompiler(compiler: javax.tools.JavaCompiler) extends XJavaC
        * to javac's behaviour, we report fail compilation from diagnostics. */
       compileSuccess = success && !diagnostics.hasErrors
     } finally {
+      customizedFileManager.close()
       logger.flushLines(if (compileSuccess) Level.Warn else Level.Error)
     }
     compileSuccess
