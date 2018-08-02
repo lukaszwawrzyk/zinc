@@ -26,7 +26,8 @@ object Zip4jZipOps {
   private def removeEntriesFromCentralDir(centralDir: CentralDirectory,
                                           toRemove: Set[String]): Unit = {
     val headers = getHeaders(centralDir)
-    val clearedHeaders = headers.filterNot(header => toRemove.contains(header.getFileName))
+    val sanitizedToRemove = toRemove.map(_.stripPrefix("/"))
+    val clearedHeaders = headers.filterNot(header => sanitizedToRemove.contains(header.getFileName))
     centralDir.getCentralDirectory.setFileHeaders(asArrayList(clearedHeaders))
   }
 

@@ -97,7 +97,7 @@ object STJ extends PathFunctions with Debugging {
   def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
     val jarFile = jarUriToFile(jar)
     if (jarFile.exists()) {
-      JavaZipOps.removeFromJar(jarFile, classes)
+      Zip4jZipOps.removeEntries(jarFile.toPath, classes.toSet)
     }
   }
 
