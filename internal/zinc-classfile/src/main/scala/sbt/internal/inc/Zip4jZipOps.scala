@@ -12,34 +12,37 @@ import net.lingala.zip4j.model.{ ZipModel, FileHeader }
 
 object Zip4jZipOps {
 
+  type CentralDirectory = ZipModel
+
   def removeEntries(path: Path, toRemove: Set[String]): Unit = {
-    val model = readModel(path)
-    removeEntriesFromCentralDir(model, toRemove)
+    val centralDir = readCentralDir(path)
+    removeEntriesFromCentralDir(centralDir, toRemove)
     val file = openFile(path)
-    truncateCentralDir(model, file)
-    val writeOffset = startOfCentralDir(model)
-    finalizeZip(model, file, writeOffset)
+    truncateCentralDir(centralDir, file)
+    val writeOffset = startOfCentralDir(centralDir)
+    finalizeZip(centralDir, file, writeOffset)
   }
 
-  private def removeEntriesFromCentralDir(model: ZipModel, toRemove: Set[String]): Unit = {
-    val headers = getHeaders(model)
+  private def removeEntriesFromCentralDir(centralDir: CentralDirectory,
+                                          toRemove: Set[String]): Unit = {
+    val headers = getHeaders(centralDir)
     val clearedHeaders = headers.filterNot(header => toRemove.contains(header.getFileName))
-    model.getCentralDirectory.setFileHeaders(asArrayList(clearedHeaders))
+    centralDir.getCentralDirectory.setFileHeaders(asArrayList(clearedHeaders))
   }
 
   def mergeArchives(target: Path, source: Path): Unit = {
-    val targetModel = readModel(target)
-    val sourceModel = readModel(source)
+    val targetCentralDir = readCentralDir(target)
+    val sourceCentralDir = readCentralDir(source)
 
     val targetFile = openFile(target)
     val sourceFile = openFile(source)
 
-    truncateCentralDir(targetModel, targetFile)
+    truncateCentralDir(targetCentralDir, targetFile)
 
     // "source" starts where "target" ends
     val sourceStart = targetFile.size()
     // "source" is as long as from its beginning till the start of central dir
-    val sourceLength = startOfCentralDir(sourceModel)
+    val sourceLength = startOfCentralDir(sourceCentralDir)
 
     transferAll(from = sourceFile,
                 to = targetFile,
@@ -47,20 +50,20 @@ object Zip4jZipOps {
                 bytesToTransfer = sourceLength)
     sourceFile.close()
 
-    val mergedHeaders = mergeHeaders(targetModel, sourceModel, sourceStart)
-    targetModel.getCentralDirectory.setFileHeaders(asArrayList(mergedHeaders))
+    val mergedHeaders = mergeHeaders(targetCentralDir, sourceCentralDir, sourceStart)
+    targetCentralDir.getCentralDirectory.setFileHeaders(asArrayList(mergedHeaders))
 
     val centralDirStart = sourceStart + sourceLength
-    targetModel.getEndCentralDirRecord.setOffsetOfStartOfCentralDir(centralDirStart)
+    targetCentralDir.getEndCentralDirRecord.setOffsetOfStartOfCentralDir(centralDirStart)
 
-    finalizeZip(targetModel, targetFile, centralDirStart)
+    finalizeZip(targetCentralDir, targetFile, centralDirStart)
 
     Files.delete(source)
   }
 
   private def mergeHeaders(
-      targetModel: ZipModel,
-      sourceModel: ZipModel,
+      targetModel: CentralDirectory,
+      sourceModel: CentralDirectory,
       sourceStart: Long
   ): Seq[FileHeader] = {
     val sourceHeaders = getHeaders(sourceModel)
@@ -80,27 +83,28 @@ object Zip4jZipOps {
     targetHeaders ++ sourceHeaders
   }
 
-  private def readModel(path: Path): ZipModel = {
+  private def readCentralDir(path: Path): CentralDirectory = {
     val file = new RandomAccessFile(path.toFile, "rw")
     val headerReader = new HeaderReader(file)
-    val model = headerReader.readAllHeaders()
+    val centralDir = headerReader.readAllHeaders()
     file.close()
-    model
+    centralDir
   }
 
-  private def startOfCentralDir(model: ZipModel) = {
-    model.getEndCentralDirRecord.getOffsetOfStartOfCentralDir
+  private def startOfCentralDir(centralDir: CentralDirectory) = {
+    centralDir.getEndCentralDirRecord.getOffsetOfStartOfCentralDir
   }
 
-  private def getHeaders(model: ZipModel): Seq[FileHeader] = {
-    model.getCentralDirectory.getFileHeaders.asInstanceOf[ArrayList[FileHeader]].asScala
+  private def getHeaders(centralDir: CentralDirectory): Seq[FileHeader] = {
+    centralDir.getCentralDirectory.getFileHeaders.asInstanceOf[ArrayList[FileHeader]].asScala
   }
 
-  private def truncateCentralDir(model: ZipModel, channel: FileChannel): FileChannel = {
-    channel.truncate(startOfCentralDir(model))
+  private def truncateCentralDir(centralDir: CentralDirectory,
+                                 channel: FileChannel): FileChannel = {
+    channel.truncate(startOfCentralDir(centralDir))
   }
 
-  private def finalizeZip(centralDir: ZipModel,
+  private def finalizeZip(centralDir: CentralDirectory,
                           channel: FileChannel,
                           centralDirStart: Long): Unit = {
     val outputStream = Channels.newOutputStream(channel.position(centralDirStart))
