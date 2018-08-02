@@ -8,7 +8,7 @@ import sbt.io.IO
 
 class ZincFileCommands(baseDirectory: File) extends FileCommands(baseDirectory) {
   override def apply(command: String, arguments: List[String]): Unit = {
-    println(s">?>?>?> running $command with ${arguments.mkString(" ")}")
+    println(s"Processing $$ $command ${arguments.mkString(" ")}")
     commands.get(command).map(_(arguments)) match {
       case Some(_) => ()
       case None    => scriptError("unknown command " + command); ()

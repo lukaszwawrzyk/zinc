@@ -21,7 +21,7 @@ class IncScriptedHandlers(globalCacheDir: File) extends HandlersProvider {
     '$' -> new SleepingHandler(new ZincFileCommands(config.testDirectory()), 500),
     '#' -> new sbt.internal.scripted.BasicStatementHandler {
       def apply(command: String, args: List[String]) = {
-        println(s">#>#>#>#>#> $command ${args.mkString(" ")}")
+        println(s"Processing # $command ${args.mkString(" ")}")
       }
     },
     '>' -> {

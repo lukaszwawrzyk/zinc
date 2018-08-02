@@ -96,7 +96,7 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
   def lookupProject(name: String): ProjectStructure = buildStructure(name)
 
   override def apply(command: String, arguments: List[String], state: State): State = {
-    println(s"><><><>< running $command with ${arguments.mkString(" ")}")
+    println(s"Processing > $command ${arguments.mkString(" ")}")
     val splitCommands = command.split("/").toList
     // Note that root does not do aggregation as sbt does.
     val (project, commandToRun) = splitCommands match {
