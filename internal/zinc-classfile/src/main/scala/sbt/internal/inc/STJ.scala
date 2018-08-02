@@ -10,14 +10,19 @@ import scala.collection.mutable.ListBuffer
 import java.util.function.Consumer
 import java.nio.file._
 
-import scala.util.Try
 import java.util.UUID
 
 import sbt.io.IO.FileScheme
 import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 
-object STJ {
+object STJ extends PathFunctions with Debugging {
+
+  // puts all files in `from` (overriding the original files in case of conflicts)
+  // into `to`, removing `from`. In other words it merges `from` into `into`.
+  def mergeJars(into: File, from: File): Unit = {
+    Zip4jZipOps.mergeArchives(target = into.toPath, source = from.toPath)
+  }
 
   def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
     JavaZipOps.withZipFs(uri, create)(action)
@@ -27,17 +32,76 @@ object STJ {
     withZipFs(fileToJarUri(file), create)(action)
   }
 
-  // puts all files in `from` (overriding the original files in case of conflicts)
-  // into `to`, removing `from`. In other words it merges `from` into `into`.
-  def mergeJars(into: File, from: File): Unit = {
-    Zip4jZipOps.mergeArchives(target = into.toPath, source = from.toPath)
+  def getModifiedTimeOrZero(file: File): Long = {
+    if (file.exists()) {
+      IO.getModifiedTimeOrZero(file)
+    } else if (isJar(file)) {
+      readModifiedTimeFromJar(file.getPath)
+    } else {
+      0
+    }
   }
 
-  // useful for debuging files
-  def pause(msg: String): Unit = {
-    Console.readLine(msg)
+  def readModifiedTimeFromJar(jc: JaredClass): Long = {
+    val (jar, cls) = toJarAndRelClass(jc)
+    if (jar.exists()) {
+      withZipFs(jar) { fs =>
+        val path = fs.getPath(cls)
+        if (Files.exists(path)) {
+          Files.getLastModifiedTime(path).toMillis
+        } else 0
+      }
+    } else 0
   }
 
+  def existsInJar(s: JaredClass): Boolean = {
+    val (jar, cls) = toJarAndRelClass(s)
+    jar.exists() && {
+      val file = new ZipFile(jar, ZipFile.OPEN_READ)
+      val entryExists = file.getEntry(cls) != null
+      file.close()
+      entryExists
+    }
+  }
+
+  def withPreviousJar[A](output: Output)(compile: /*extra cp: */ Seq[File] => A): A = {
+    extractJarOutput(output)
+      .map { outputJar =>
+        val prevJarName = outputJar.getName.replace(".jar", "_prev.jar")
+        val prevJar = outputJar.toPath.resolveSibling(prevJarName).toFile
+        if (outputJar.exists()) {
+          IO.move(outputJar, prevJar)
+        }
+
+        val result = try {
+          compile(Seq(prevJar))
+        } catch {
+          case e: Exception =>
+            if (prevJar.exists()) {
+              IO.move(prevJar, outputJar)
+            }
+            throw e
+        }
+
+        if (prevJar.exists() && outputJar.exists()) {
+          STJ.mergeJars(into = prevJar, from = outputJar)
+          IO.move(prevJar, outputJar)
+        }
+        result
+      }
+      .getOrElse {
+        compile(Nil)
+      }
+  }
+
+  def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
+    val jarFile = jarUriToFile(jar)
+    if (jarFile.exists()) {
+      JavaZipOps.removeFromJar(jarFile, classes)
+    }
+  }
+
+  // used only in tests
   def listFiles(f: File): Seq[String] = {
     if (f.exists()) {
       withZipFs(f) { fs =>
@@ -51,6 +115,10 @@ object STJ {
       }
     } else Nil
   }
+
+}
+
+sealed trait PathFunctions {
 
   type JaredClass = String
   type RelClass = String
@@ -123,33 +191,11 @@ object STJ {
     new URI("jar:" + jarFile.toURI.toString)
   }
 
-  def getModifiedTimeOrZero(file: File): Long = {
-    if (file.exists()) {
-      IO.getModifiedTimeOrZero(file)
-    } else if (isJar(file)) {
-      readModifiedTimeFromJar(file.getPath)
-    } else {
-      0
-    }
-  }
-
   def isJar(file: File): Boolean = {
     file.getPath.split("!") match {
       case Array(jar, cls) => jar.endsWith(".jar")
       case _               => false
     }
-  }
-
-  def readModifiedTimeFromJar(jc: JaredClass): Long = {
-    val (jar, cls) = toJarAndRelClass(jc)
-    if (jar.exists()) {
-      withZipFs(jar) { fs =>
-        val path = fs.getPath(cls)
-        if (Files.exists(path)) {
-          Files.getLastModifiedTime(path).toMillis
-        } else 0
-      }
-    } else 0
   }
 
   def toJarAndRelClass(c: JaredClass): (File, RelClass) = {
@@ -158,54 +204,6 @@ object STJ {
     // because it is often stored in File that controls the slashes
     val fixedRelClass = relClass.replace("\\", "/")
     (new File(jar), fixedRelClass)
-  }
-
-  def existsInJar(s: JaredClass): Boolean = {
-    val (jar, cls) = toJarAndRelClass(s)
-    if (jar.exists()) {
-      val file = new ZipFile(jar, ZipFile.OPEN_READ)
-      val exists = file.getEntry(cls) != null
-      file.close()
-      exists
-    } else {
-      false
-    }
-  }
-
-  def withPreviousJar[A](output: Output)(compile: /*extra cp: */ Seq[File] => A): A = {
-    extractJarOutput(output)
-      .map { outputJar =>
-        val prevJar =
-          outputJar.toPath.resolveSibling(outputJar.getName.replace(".jar", "_prev.jar")).toFile
-        if (outputJar.exists()) {
-          IO.move(outputJar, prevJar)
-        }
-
-        val res = try compile(Seq(prevJar))
-        catch {
-          case e: Exception =>
-            if (prevJar.exists()) {
-              IO.move(prevJar, outputJar)
-            }
-            throw e
-        }
-
-        if (prevJar.exists() && outputJar.exists()) {
-          STJ.mergeJars(into = prevJar, from = outputJar)
-          IO.move(prevJar, outputJar)
-        }
-        res
-      }
-      .getOrElse {
-        compile(Nil)
-      }
-  }
-
-  def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
-    val jarFile = jarUriToFile(jar)
-    if (jarFile.exists()) {
-      JavaZipOps.removeFromJar(jarFile, classes)
-    }
   }
 
   def isEnabled(output: Output): Boolean = {
@@ -248,9 +246,13 @@ object STJ {
     }
   }
 
-  // for debugging purposes, fails if file is currently open
+}
+
+sealed trait Debugging { this: PathFunctions =>
+
+  // fails if file is currently open
   def touchOutputFile(output: Output, msg: String): Unit = {
-    STJ.extractJarOutput(output).foreach { jarOut =>
+    extractJarOutput(output).foreach { jarOut =>
       if (jarOut.exists()) {
         System.out.flush()
         println("$$$ ??? " + msg)
@@ -264,6 +266,11 @@ object STJ {
         println(s"$$$$$$ !!! $msg")
       }
     }
+  }
+
+  // useful for debuging files
+  def pause(msg: String): Unit = {
+    Console.readLine(msg)
   }
 
 }

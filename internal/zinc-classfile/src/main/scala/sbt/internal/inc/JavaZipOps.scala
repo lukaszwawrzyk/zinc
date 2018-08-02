@@ -5,7 +5,7 @@ import java.nio.file._
 import java.io.File
 import java.net.URI
 
-import sbt.internal.inc.STJ.{ RelClass, withZipFs }
+import sbt.internal.inc.STJ.RelClass
 
 object JavaZipOps {
 
