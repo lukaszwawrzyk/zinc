@@ -249,6 +249,7 @@ public class ZipMetadata {
         byte[] name;
         int    hashcode;  // node is hashable/hashed by its name
         int    pos = -1;  // position in cen table, -1 menas the
+        String nameAsString;
         // entry does not exists in zip file
         IndexNode(byte[] name, int pos) {
             setName(name);
@@ -264,8 +265,11 @@ public class ZipMetadata {
             this.hashcode = Arrays.hashCode(name);
         }
 
-        public final byte[] getName() {
-            return this.name;
+        public final String getName() {
+            if (nameAsString == null) {
+                this.nameAsString = new String(name);
+            }
+            return this.nameAsString;
         }
 
         final IndexNode as(byte[] name) {           // reuse the node, mostly

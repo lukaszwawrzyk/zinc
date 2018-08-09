@@ -30,7 +30,7 @@ object IndexBasedZipFsOps extends IndexBasedZipOps {
   }
 
   protected def getFileName(header: Header): String = {
-    new String(header.getName)
+    header.getName
   }
 
   protected def getFileOffset(header: Header): Long = {
