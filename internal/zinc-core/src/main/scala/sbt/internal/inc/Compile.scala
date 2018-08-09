@@ -61,7 +61,13 @@ object IncrementalCompile {
       log: Logger,
       options: IncOptions): (Boolean, Analysis) = {
     val previous = previous0 match { case a: Analysis => a }
-    val current = Stamps.initial(Stamper.forLastModified, Stamper.forHash, Stamper.forLastModified)
+    def current: ReadStamps = {
+      val readStamp = STJ
+        .extractJarOutput(output)
+        .map(Stamper.cachedForOutputJar)
+        .getOrElse(Stamper.forLastModified)
+      Stamps.initial(readStamp, Stamper.forHash, Stamper.forLastModified)
+    }
     val internalBinaryToSourceClassName = (binaryClassName: String) =>
       previous.relations.productClassName.reverse(binaryClassName).headOption
     val internalSourceToClassNamesMap: File => Set[String] = (f: File) =>
@@ -108,7 +114,7 @@ private object AnalysisCallback {
       internalBinaryToSourceClassName: String => Option[String],
       internalSourceToClassNamesMap: File => Set[String],
       externalAPI: (File, String) => Option[AnalyzedClass],
-      current: ReadStamps,
+      current: => ReadStamps,
       output: Output,
       options: IncOptions
   ) {

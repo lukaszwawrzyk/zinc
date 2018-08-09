@@ -41,6 +41,10 @@ object IndexBasedZipFsOps extends IndexBasedZipOps {
     header.setEntryOffset(offset)
   }
 
+  protected def getLastModifiedTime(header: Header): Long = {
+    header.getLastModifiedTime
+  }
+
   protected def dumpMetadata(metadata: Metadata, outputStream: OutputStream): Unit = {
     metadata.dump(outputStream)
   }

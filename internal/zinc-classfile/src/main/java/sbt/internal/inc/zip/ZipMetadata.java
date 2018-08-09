@@ -463,11 +463,15 @@ public class ZipMetadata {
 
         Entry() {}
 
-        public long getEntryOffset() {
+        public final long getLastModifiedTime() {
+            return mtime;
+        }
+
+        public final long getEntryOffset() {
             return locoff;
         }
 
-        public void setEntryOffset(long value) {
+        public final  void setEntryOffset(long value) {
             this.locoff = value;
         }
 

@@ -32,14 +32,15 @@ object STJ extends PathFunctions with Debugging {
     withZipFs(fileToJarUri(file), create)(action)
   }
 
-  def getModifiedTimeOrZero(file: File): Long = {
-    if (file.exists()) {
-      IO.getModifiedTimeOrZero(file)
-    } else if (isJar(file)) {
-      readModifiedTimeFromJar(file.getPath)
-    } else {
-      0
-    }
+  def getCachedStampReader(outputJar: File): File => Long = {
+    val reader = new IndexBasedZipFsOps.CachedStampReader(outputJar)
+    file: File =>
+      if (isJar(file)) {
+        val (jar, cls) = toJarAndRelClass(file.toString)
+        reader.readStamp(jar, cls)
+      } else {
+        IO.getModifiedTimeOrZero(file)
+      }
   }
 
   def readModifiedTimeFromJar(jc: JaredClass): Long = {
@@ -249,6 +250,13 @@ sealed trait PathFunctions {
 }
 
 sealed trait Debugging { this: PathFunctions =>
+
+  def touchOutputFile(jar: File, msg: String): Unit = {
+    val output = new SingleOutput {
+      override def getOutputDirectory: File = jar
+    }
+    touchOutputFile(output, msg)
+  }
 
   // fails if file is currently open
   def touchOutputFile(output: Output, msg: String): Unit = {
