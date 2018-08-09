@@ -142,12 +142,8 @@ object Stamper {
   }
 
   val forHash = (toStamp: File) => tryStamp(Hash.ofFile(toStamp))
-  val forLastModified = { toStamp: File =>
-    tryStamp(new LastModified(IO.getModifiedTimeOrZero(toStamp)))
-  }
-
-  def cachedForOutputJar(output: File) = {
-    val reader = STJ.getCachedStampReader(output)
+  def forLastModified = {
+    val reader = STJ.createCachedStampReader()
     toStamp: File =>
       tryStamp(new LastModified(reader(toStamp)))
   }

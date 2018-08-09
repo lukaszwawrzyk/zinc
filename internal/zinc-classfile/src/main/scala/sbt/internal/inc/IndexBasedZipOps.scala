@@ -6,19 +6,24 @@ import java.nio.file.{ Files, Path }
 
 trait IndexBasedZipOps {
 
-  class CachedStampReader(outputJar: File) {
-    private lazy val cachedNameToTimestamp: Map[String, Long] = {
-      if (outputJar.exists()) {
-        val metadata = readMetadata(outputJar.toPath)
+  class CachedStampReader {
+    private var cachedNameToTimestamp: Map[String, Long] = _
+
+    def readStamp(jar: File, cls: String): Long = {
+      if (cachedNameToTimestamp == null) {
+        cachedNameToTimestamp = initializeCache(jar)
+      }
+      cachedNameToTimestamp.getOrElse(cls, 0)
+    }
+
+    private def initializeCache(jar: File): Map[String, Long] = {
+      if (jar.exists()) {
+        val metadata = readMetadata(jar.toPath)
         val headers = getHeaders(metadata)
         headers.map(header => getFileName(header) -> getLastModifiedTime(header))(collection.breakOut)
       } else {
         Map.empty
       }
-    }
-
-    def readStamp(jar: File, cls: String): Long = {
-      cachedNameToTimestamp.getOrElse(cls, 0)
     }
   }
 

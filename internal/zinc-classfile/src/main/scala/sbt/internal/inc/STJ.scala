@@ -32,8 +32,8 @@ object STJ extends PathFunctions with Debugging {
     withZipFs(fileToJarUri(file), create)(action)
   }
 
-  def getCachedStampReader(outputJar: File): File => Long = {
-    val reader = new IndexBasedZipFsOps.CachedStampReader(outputJar)
+  def createCachedStampReader(): File => Long = {
+    val reader = new IndexBasedZipFsOps.CachedStampReader
     file: File =>
       if (isJar(file)) {
         val (jar, cls) = toJarAndRelClass(file.toString)
