@@ -45,10 +45,7 @@ trait IndexBasedZipOps {
     // "source" is as long as from its beginning till the start of central dir
     val sourceLength = getCentralDirStart(sourceMetadata)
 
-    val sourceFile = openFileForReading(source)
-    val targetFile = openFileForWriting(target)
-    transferAll(from = sourceFile, to = targetFile, startPos = sourceStart, bytesToTransfer = sourceLength)
-    sourceFile.close()
+    transferAll(source, target, startPos = sourceStart, bytesToTransfer = sourceLength)
 
     val mergedHeaders = mergeHeaders(targetMetadata, sourceMetadata, sourceStart)
     setHeaders(targetMetadata, mergedHeaders)
@@ -104,27 +101,31 @@ trait IndexBasedZipOps {
     outputStream.close()
   }
 
+  protected def transferAll(
+    source: Path,
+    target: Path,
+    startPos: Long,
+    bytesToTransfer: Long
+  ): Unit = {
+    val sourceFile = openFileForReading(source)
+    val targetFile = openFileForWriting(target)
+    var remaining = bytesToTransfer
+    var offset = startPos
+    while (remaining > 0) {
+      val transferred = targetFile.transferFrom(sourceFile, /*position =*/ offset, /*count = */ remaining)
+      offset += transferred
+      remaining -= transferred
+    }
+    sourceFile.close()
+    targetFile.close()
+  }
+
   protected def openFileForReading(path: Path): ReadableByteChannel = {
     Channels.newChannel(new BufferedInputStream(Files.newInputStream(path)))
   }
 
   protected def openFileForWriting(path: Path): FileChannel = {
     new FileOutputStream(path.toFile, true).getChannel
-  }
-
-  protected def transferAll(
-    from: ReadableByteChannel,
-    to: FileChannel,
-    startPos: Long,
-    bytesToTransfer: Long
-  ): Unit = {
-    var remaining = bytesToTransfer
-    var offset = startPos
-    while (remaining > 0) {
-      val transferred = to.transferFrom(from, /*position =*/ offset, /*count = */ remaining)
-      offset += transferred
-      remaining -= transferred
-    }
   }
 
   protected def readMetadata(path: Path): Metadata
