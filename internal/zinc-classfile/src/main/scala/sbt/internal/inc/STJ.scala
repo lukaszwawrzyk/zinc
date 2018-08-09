@@ -21,7 +21,7 @@ object STJ extends PathFunctions with Debugging {
   // puts all files in `from` (overriding the original files in case of conflicts)
   // into `to`, removing `from`. In other words it merges `from` into `into`.
   def mergeJars(into: File, from: File): Unit = {
-    Zip4jZipOps.mergeArchives(target = into.toPath, source = from.toPath)
+    IndexBasedZipFsOps.mergeArchives(into, from)
   }
 
   def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
@@ -97,7 +97,7 @@ object STJ extends PathFunctions with Debugging {
   def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
     val jarFile = jarUriToFile(jar)
     if (jarFile.exists()) {
-      Zip4jZipOps.removeEntries(jarFile.toPath, classes.toSet)
+      IndexBasedZipFsOps.removeEntries(jarFile, classes)
     }
   }
 

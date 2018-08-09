@@ -511,7 +511,6 @@ lazy val zincClassfile = (project in internalPath / "zinc-classfile")
   .dependsOn(compilerInterface % "compile;test->test")
   .configure(addBaseSettingsAndTestDeps)
   .settings(
-    libraryDependencies += zip4j,
     name := "zinc Classfile",
     crossScalaVersions := compilerBridgeTestScalaVersions,
     compilerVersionDependentScalacOptions,
