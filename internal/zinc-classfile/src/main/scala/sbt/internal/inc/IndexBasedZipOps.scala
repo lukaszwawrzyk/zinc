@@ -40,7 +40,6 @@ trait IndexBasedZipOps {
     val targetMetadata = readMetadata(target)
     val sourceMetadata = readMetadata(source)
 
-
     // "source" starts where "target" ends
     val sourceStart = truncateMetadata(targetMetadata, target)
     // "source" is as long as from its beginning till the start of central dir
@@ -98,13 +97,12 @@ trait IndexBasedZipOps {
     path: Path,
     metadataStart: Long
   ): Unit = {
-    val fileOutputStream = new FileOutputStream(path.toFile)
+    val fileOutputStream = new FileOutputStream(path.toFile, true)
     fileOutputStream.getChannel.position(metadataStart)
     val outputStream = new BufferedOutputStream(fileOutputStream)
     dumpMetadata(metadata, outputStream)
     outputStream.close()
   }
-
 
   protected def openFileForReading(path: Path): ReadableByteChannel = {
     Channels.newChannel(new BufferedInputStream(Files.newInputStream(path)))
