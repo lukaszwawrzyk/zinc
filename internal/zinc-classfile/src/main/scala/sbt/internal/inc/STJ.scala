@@ -76,27 +76,7 @@ object STJ extends PathFunctions with Debugging {
       }
   }
 
-  // used in cfm for copying
-  def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
-    JavaZipOps.withZipFs(uri, create)(action)
-  }
-
-  // in cfm
-  def existsInJar(s: JaredClass): Boolean = {
-    val (jar, cls) = toJarAndRelClass(s)
-    jar.exists() && {
-      val file = new ZipFile(jar, ZipFile.OPEN_READ)
-      val entryExists = file.getEntry(cls) != null
-      file.close()
-      entryExists
-    }
-  }
-
   // used only in tests
-  def withZipFs[A](file: File, create: Boolean = false)(action: FileSystem => A): A = {
-    withZipFs(fileToJarUri(file), create)(action)
-  }
-
   def listFiles(f: File): Seq[String] = {
     if (f.exists()) {
       withZipFs(f) { fs =>
@@ -121,6 +101,30 @@ object STJ extends PathFunctions with Debugging {
         } else 0
       }
     } else 0
+  }
+
+  def existsInJar(s: JaredClass): Boolean = {
+    val (jar, cls) = toJarAndRelClass(s)
+    jar.exists() && {
+      val file = new ZipFile(jar, ZipFile.OPEN_READ)
+      val entryExists = file.getEntry(cls) != null
+      file.close()
+      entryExists
+    }
+  }
+
+  private def withZipFs[A](file: File, create: Boolean = false)(action: FileSystem => A): A = {
+    withZipFs(fileToJarUri(file), create)(action)
+  }
+
+  private def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
+    val env = new java.util.HashMap[String, String]
+    if (create) env.put("create", "true")
+    val fs = FileSystems.newFileSystem(uri, env)
+    try action(fs)
+    finally {
+      fs.close()
+    }
   }
 
 }
