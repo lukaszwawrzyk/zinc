@@ -11,16 +11,11 @@ package inc
 
 import sbt.io.IO
 import java.io.File
+import java.net.URI
 import java.util.Optional
 
 import collection.mutable
-import xsbti.compile.{
-  ClassFileManager => XClassFileManager,
-  ClassFileManagerType,
-  DeleteImmediatelyManagerType,
-  IncOptions,
-  TransactionalManagerType
-}
+import xsbti.compile.{ IncOptions, DeleteImmediatelyManagerType, TransactionalManagerType, ClassFileManagerType, ClassFileManager => XClassFileManager }
 
 object ClassFileManager {
   def getDefaultClassFileManager(
@@ -47,6 +42,24 @@ object ClassFileManager {
       IO.deleteFilesEmptyDirs(classes)
     override def generated(classes: Array[File]): Unit = ()
     override def complete(success: Boolean): Unit = ()
+  }
+
+  private final class JaredDeleteClassFileManager extends XClassFileManager {
+    override def delete(classes: Array[File]): Unit = {
+      groupByJars(classes.map(_.toString)).foreach {
+        case (jar, classes) =>
+          STJ.removeFromJar(jar, classes)
+      }
+    }
+    override def generated(classes: Array[File]): Unit = ()
+    override def complete(success: Boolean): Unit = ()
+  }
+
+  private def groupByJars(jared: Iterable[STJ.JaredClass]): Map[URI, Iterable[STJ.RelClass]] = {
+    jared
+      .map(jc => STJ.toJarUriAndRelClass(jc))
+      .groupBy(_._1)
+      .mapValues(_.map(_._2))
   }
 
   /**
