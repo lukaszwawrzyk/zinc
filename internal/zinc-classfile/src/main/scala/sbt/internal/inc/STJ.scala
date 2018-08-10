@@ -39,8 +39,7 @@ object STJ extends PathFunctions with Debugging {
       }
   }
 
-  def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
-    val jarFile = jarUriToFile(jar)
+  def removeFromJar(jarFile: File, classes: Iterable[RelClass]): Unit = {
     if (jarFile.exists()) {
       IndexBasedZipFsOps.removeEntries(jarFile, classes)
     }
@@ -180,12 +179,15 @@ sealed trait PathFunctions {
     }
   }
 
-  // this trailing slash in RelPath is messed up
-  // I am not sure why I put trailing backslash here
   def toJarUriAndRelClass(jc: JaredClass): (URI, RelClass) = {
     val Array(jar, cls) = jc.split("!")
     val uri = fileToJarUri(new File(jar))
     (uri, cls)
+  }
+
+  def toRelClass(jc: JaredClass): RelClass = {
+    val Array(_, cls) = jc.split("!")
+    cls
   }
 
   def jaredClassToJarFile(jc: JaredClass): File = {

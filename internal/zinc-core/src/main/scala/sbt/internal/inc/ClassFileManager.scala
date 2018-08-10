@@ -61,13 +61,14 @@ object ClassFileManager {
     }
     override def generated(classes: Array[File]): Unit = ()
     override def complete(success: Boolean): Unit = ()
-  }
 
-  private def groupByJars(jared: Iterable[STJ.JaredClass]): Map[URI, Iterable[STJ.RelClass]] = {
-    jared
-      .map(jc => STJ.toJarUriAndRelClass(jc))
-      .groupBy(_._1)
-      .mapValues(_.map(_._2))
+    private def groupByJars(jared: Iterable[STJ.JaredClass]): Map[File, Iterable[STJ.RelClass]] = {
+      jared
+        .map(jc => STJ.toJarAndRelClass(jc))
+        .groupBy(_._1)
+        .mapValues(_.map(_._2))
+    }
+
   }
 
   /**
@@ -153,11 +154,9 @@ object ClassFileManager {
       }
     }
 
-    override def delete(classes: Array[File]): Unit = {
-      groupByJars(classes.map(_.toString)).foreach {
-        case (jar, classes) =>
-          STJ.removeFromJar(jar, classes)
-      }
+    override def delete(jaredClasses: Array[File]): Unit = {
+      val classes = jaredClasses.map(s => STJ.toRelClass(s.toString))
+      STJ.removeFromJar(outputJar.toFile, classes)
     }
 
     override def generated(classes: Array[File]): Unit = ()
