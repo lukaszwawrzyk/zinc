@@ -12,7 +12,8 @@ package inc
 import sbt.io.IO
 import java.io.File
 import java.net.URI
-import java.util.Optional
+import java.nio.file.{ Files, StandardCopyOption }
+import java.util.{ UUID, Optional }
 
 import collection.mutable
 import xsbti.compile.{ IncOptions, DeleteImmediatelyManagerType, TransactionalManagerType, ClassFileManagerType, ClassFileManager => XClassFileManager }
@@ -77,7 +78,7 @@ object ClassFileManager {
     * This is the default class file manager used by sbt, and makes sense in a lot of scenarios.
     */
   def transactional(tempDir0: File, logger: sbt.util.Logger): XClassFileManager =
-    new TransactionalClassFileManager(tempDir0, logger)
+    new JaredTransactionalClassFileManager(tempDir0, logger)
 
   private final class TransactionalClassFileManager(tempDir0: File, logger: sbt.util.Logger)
     extends XClassFileManager {
@@ -125,6 +126,95 @@ object ClassFileManager {
       val target = File.createTempFile("sbt", ".class", tempDir)
       IO.move(c, target)
       target
+    }
+  }
+
+  private final class JaredTransactionalClassFileManager(tempDir0: File, logger: sbt.util.Logger)
+      extends XClassFileManager {
+    val tempDir = tempDir0.getCanonicalFile
+    IO.delete(tempDir)
+    IO.createDirectory(tempDir)
+    logger.debug(s"Created transactional ClassFileManager with tempDir = $tempDir")
+
+    private[this] val generatedClasses = new mutable.HashSet[File]
+    private[this] val movedJaredClasses = new mutable.HashMap[STJ.JaredClass, URI]
+    private[this] val realToTmpJars = new mutable.HashMap[URI, URI]
+
+    private def showFiles(files: Iterable[File]): String = {
+      if (files.isEmpty) {
+        "[]"
+      } else {
+        files.map(f => s"\t$f").mkString("\n")
+      }
+    }
+
+    override def delete(classes: Array[File]): Unit = {
+      show(s"About to delete class files:\n${showFiles(classes)}")
+      val jared = classes.map(_.toString)
+      val toBeBackedUp = jared.filter { jc =>
+        STJ.existsInJar(jc) && !movedJaredClasses.contains(jc) && !generatedClasses.contains(
+          new File(jc))
+      }
+      show(s"We backup jared class files:\n${showFiles(toBeBackedUp.map(new File(_)))}")
+      groupByJars(toBeBackedUp).foreach {
+        case (jar, classes) =>
+          // backup
+          def newTmpJar =
+            STJ.fileToJarUri(new File(tempDir, UUID.randomUUID.toString + ".jar"))
+          val targetJar = realToTmpJars.getOrElse(jar, newTmpJar)
+          if (classes.nonEmpty) {
+            STJ.withZipFs(jar, create = false) { srcFs =>
+              STJ.withZipFs(targetJar, create = true) { dstFs =>
+                for (c <- classes) {
+                  movedJaredClasses.put(STJ.fromJarUriAndRelClass(jar, c), targetJar)
+                  val src = srcFs.getPath(c)
+                  val dst = dstFs.getPath(c)
+                  if (!Files.isDirectory(src)) {
+                    Option(dst.getParent).foreach(Files.createDirectories(_))
+                  }
+                  Files.copy(src, dst, StandardCopyOption.COPY_ATTRIBUTES)
+                }
+              }
+            }
+          }
+          // remove
+          show(s"Removing ${classes.toList.mkString("\n")} from $jar")
+          STJ.removeFromJar(jar, classes)
+      }
+    }
+
+    override def generated(classes: Array[File]): Unit = {
+      show(s"Registering generated classes:\n${showFiles(classes)}")
+      generatedClasses ++= classes
+      ()
+    }
+
+    override def complete(success: Boolean): Unit = {
+      if (!success) {
+        show("Rolling back changes to class files.")
+        show(s"Removing generated classes:\n${showFiles(generatedClasses)}")
+        groupByJars(generatedClasses.map(_.toString)).foreach {
+          case (jar, classes) => STJ.removeFromJar(jar, classes)
+        }
+
+        val toMove = movedJaredClasses.toSeq.map {
+          case (jaredClass, tmpJar) =>
+            val srcJar = STJ.jaredClassToJarFile(jaredClass)
+            (srcJar, STJ.jarUriToFile(tmpJar))
+        }.distinct
+        show(
+          s"Restoring jared class files: \n${showFiles(movedJaredClasses.keys.map(new File(_)))}")
+        toMove.foreach {
+          case (srcJar, tmpJar) =>
+            STJ.mergeJars(into = srcJar, from = tmpJar)
+        }
+      }
+      logger.debug(s"Removing the temporary directory used for backing up class files: $tempDir")
+      IO.delete(tempDir)
+    }
+
+    private def show(a: String): Unit = {
+      logger.debug(a)
     }
   }
 }
