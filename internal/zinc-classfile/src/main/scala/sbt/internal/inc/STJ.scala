@@ -148,7 +148,7 @@ sealed trait PathFunctions {
     fromJarUriAndRelClass(URI.create(jarUri), cls)
   }
 
-  def fromJarUriAndRelClass(jarUri: URI, cls: RelClass): JaredClass = {
+  private def fromJarUriAndRelClass(jarUri: URI, cls: RelClass): JaredClass = {
     val jar = jarUriToFile(jarUri)
     // TODO this is needed, but hopefully shouldn't be - to investigate
     val relClass = cls.stripPrefix("/").stripPrefix("\\")
@@ -156,7 +156,7 @@ sealed trait PathFunctions {
   }
 
   // From sbt.io.IO, correctly handles uri like: file:<a windows path>
-  private[this] def uriToFile(uri: URI): File = {
+  private def uriToFile(uri: URI): File = {
     val part = uri.getSchemeSpecificPart
     // scheme might be omitted for relative URI reference.
     assert(
@@ -193,12 +193,12 @@ sealed trait PathFunctions {
     new File(jar)
   }
 
-  def jarUriToFile(jarUri: URI): File = {
+  protected def jarUriToFile(jarUri: URI): File = {
     val fileUri = URI.create(jarUri.toString.stripPrefix("jar:"))
     uriToFile(fileUri)
   }
 
-  def fileToJarUri(jarFile: File): URI = {
+  protected def fileToJarUri(jarFile: File): URI = {
     new URI("jar:" + jarFile.toURI.toString)
   }
 
