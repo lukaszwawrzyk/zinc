@@ -81,7 +81,8 @@ object IncrementalCompile {
                                      output,
                                      options),
         log,
-        options
+        options,
+        output
       )
     } catch {
       case _: xsbti.CompileCancelled =>

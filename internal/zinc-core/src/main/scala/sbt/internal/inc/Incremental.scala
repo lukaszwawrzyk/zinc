@@ -13,12 +13,7 @@ import java.io.File
 
 import sbt.util.{ Logger, Level }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
-import xsbti.compile.{
-  DependencyChanges,
-  IncOptions,
-  CompileAnalysis,
-  ClassFileManager => XClassFileManager
-}
+import xsbti.compile.{ DependencyChanges, IncOptions, CompileAnalysis, Output, ClassFileManager => XClassFileManager }
 
 /**
  * Define helpers to run incremental compilation algorithm with name hashing.
@@ -58,7 +53,8 @@ object Incremental {
       compile: (Set[File], DependencyChanges, xsbti.AnalysisCallback, XClassFileManager) => Unit,
       callbackBuilder: AnalysisCallback.Builder,
       log: sbt.util.Logger,
-      options: IncOptions
+      options: IncOptions,
+      output: Output
   )(implicit equivS: Equiv[XStamp]): (Boolean, Analysis) = {
     val previous = previous0 match { case a: Analysis => a }
     val incremental: IncrementalCommon =
@@ -81,7 +77,7 @@ object Incremental {
             "All initially invalidated sources: " + initialInvSources + "\n")
       }
     }
-    val analysis = manageClassfiles(options) { classfileManager =>
+    val analysis = manageClassfiles(options, output) { classfileManager =>
       incremental.cycle(
         initialInvClasses,
         initialInvSources,
@@ -136,8 +132,11 @@ object Incremental {
     previous -- invalidatedSrcs
   }
 
-  private[this] def manageClassfiles[T](options: IncOptions)(run: XClassFileManager => T): T = {
-    val classfileManager = ClassFileManager.getClassFileManager(options)
+  private[this] def manageClassfiles[T](options: IncOptions, output: Output)(run: XClassFileManager => T): T = {
+    val classfileManager = STJ.extractJarOutput(output)
+      .map(ClassFileManager.jarBasedTransactional)
+      .getOrElse(ClassFileManager.getClassFileManager(options))
+
     val result = try run(classfileManager)
     catch {
       case e: Throwable =>
