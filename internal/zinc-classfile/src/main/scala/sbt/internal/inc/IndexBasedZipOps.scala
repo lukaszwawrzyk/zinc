@@ -24,7 +24,8 @@ trait IndexBasedZipOps extends CreateZip {
       if (jar.exists()) {
         val metadata = readMetadata(jar.toPath)
         val headers = getHeaders(metadata)
-        headers.map(header => getFileName(header) -> getLastModifiedTime(header))(collection.breakOut)
+        headers.map(header => getFileName(header) -> getLastModifiedTime(header))(
+          collection.breakOut)
       } else {
         Map.empty
       }
@@ -67,7 +68,8 @@ trait IndexBasedZipOps extends CreateZip {
   protected def removeEntriesFromMetadata(metadata: Metadata, toRemove: Set[String]): Unit = {
     val headers = getHeaders(metadata)
     val sanitizedToRemove = toRemove.map(_.stripPrefix("/"))
-    val clearedHeaders = headers.filterNot(header => sanitizedToRemove.contains(getFileName(header)))
+    val clearedHeaders =
+      headers.filterNot(header => sanitizedToRemove.contains(getFileName(header)))
     setHeaders(metadata, clearedHeaders)
   }
 
@@ -94,9 +96,9 @@ trait IndexBasedZipOps extends CreateZip {
   }
 
   protected def mergeHeaders(
-    targetModel: Metadata,
-    sourceModel: Metadata,
-    sourceStart: Long
+      targetModel: Metadata,
+      sourceModel: Metadata,
+      sourceStart: Long
   ): Seq[Header] = {
     val sourceHeaders = getHeaders(sourceModel)
     sourceHeaders.foreach { header =>
@@ -117,17 +119,16 @@ trait IndexBasedZipOps extends CreateZip {
 
   private def truncateMetadata(metadata: Metadata, path: Path): Long = {
     val sizeAfterTruncate = getCentralDirStart(metadata)
-    new FileOutputStream(path.toFile, true)
-      .getChannel
+    new FileOutputStream(path.toFile, true).getChannel
       .truncate(sizeAfterTruncate)
       .close()
     sizeAfterTruncate
   }
 
   protected def finalizeZip(
-    metadata: Metadata,
-    path: Path,
-    metadataStart: Long
+      metadata: Metadata,
+      path: Path,
+      metadataStart: Long
   ): Unit = {
     val fileOutputStream = new FileOutputStream(path.toFile, true)
     fileOutputStream.getChannel.position(metadataStart)
@@ -137,17 +138,18 @@ trait IndexBasedZipOps extends CreateZip {
   }
 
   protected def transferAll(
-    source: Path,
-    target: Path,
-    startPos: Long,
-    bytesToTransfer: Long
+      source: Path,
+      target: Path,
+      startPos: Long,
+      bytesToTransfer: Long
   ): Unit = {
     val sourceFile = openFileForReading(source)
     val targetFile = openFileForWriting(target)
     var remaining = bytesToTransfer
     var offset = startPos
     while (remaining > 0) {
-      val transferred = targetFile.transferFrom(sourceFile, /*position =*/ offset, /*count = */ remaining)
+      val transferred =
+        targetFile.transferFrom(sourceFile, /*position =*/ offset, /*count = */ remaining)
       offset += transferred
       remaining -= transferred
     }

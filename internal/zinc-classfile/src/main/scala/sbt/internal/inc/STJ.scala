@@ -146,6 +146,7 @@ sealed trait PathFunctions {
 
   def fromJarUriAndRelClass(jarUri: URI, cls: RelClass): JaredClass = {
     val jar = jarUriToFile(jarUri)
+    // TODO this is needed, but hopefully shouldn't be - to investigate
     val relClass = cls.stripPrefix("/").stripPrefix("\\")
     init(jar, relClass)
   }
@@ -180,8 +181,7 @@ sealed trait PathFunctions {
   def toJarUriAndRelClass(jc: JaredClass): (URI, RelClass) = {
     val Array(jar, cls) = jc.split("!")
     val uri = fileToJarUri(new File(jar))
-    val path = (if (isWindows) "\\" else "/") + cls
-    (uri, path)
+    (uri, cls)
   }
 
   def jaredClassToJarFile(jc: JaredClass): File = {

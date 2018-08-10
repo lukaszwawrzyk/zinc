@@ -16,11 +16,17 @@ import java.nio.file.{ Files, StandardCopyOption, Path }
 import java.util.{ UUID, Optional }
 
 import collection.mutable
-import xsbti.compile.{ IncOptions, DeleteImmediatelyManagerType, TransactionalManagerType, ClassFileManagerType, ClassFileManager => XClassFileManager }
+import xsbti.compile.{
+  IncOptions,
+  DeleteImmediatelyManagerType,
+  TransactionalManagerType,
+  ClassFileManagerType,
+  ClassFileManager => XClassFileManager
+}
 
 object ClassFileManager {
   def getDefaultClassFileManager(
-    classFileManagerType: Optional[ClassFileManagerType]): XClassFileManager = {
+      classFileManagerType: Optional[ClassFileManagerType]): XClassFileManager = {
     if (classFileManagerType.isPresent) {
       classFileManagerType.get match {
         case _: DeleteImmediatelyManagerType => new DeleteClassFileManager
@@ -65,19 +71,19 @@ object ClassFileManager {
   }
 
   /**
-    * Constructs a minimal [[ClassFileManager]] implementation that immediately deletes
-    * class files when they are requested. This is the default implementation of the class
-    * file manager by the Scala incremental compiler if no class file manager is specified.
-    */
+   * Constructs a minimal [[ClassFileManager]] implementation that immediately deletes
+   * class files when they are requested. This is the default implementation of the class
+   * file manager by the Scala incremental compiler if no class file manager is specified.
+   */
   def deleteImmediately: XClassFileManager = new DeleteClassFileManager
 
   /**
-    * Constructs a transactional [[ClassFileManager]] implementation that restores class
-    * files to the way they were before compilation if there is an error. Otherwise, it
-    * keeps the successfully generated class files from the new compilation.
-    *
-    * This is the default class file manager used by sbt, and makes sense in a lot of scenarios.
-    */
+   * Constructs a transactional [[ClassFileManager]] implementation that restores class
+   * files to the way they were before compilation if there is an error. Otherwise, it
+   * keeps the successfully generated class files from the new compilation.
+   *
+   * This is the default class file manager used by sbt, and makes sense in a lot of scenarios.
+   */
   def transactional(tempDir0: File, logger: sbt.util.Logger): XClassFileManager =
     new TransactionalClassFileManager(tempDir0, logger)
 
@@ -86,7 +92,7 @@ object ClassFileManager {
   }
 
   private final class TransactionalClassFileManager(tempDir0: File, logger: sbt.util.Logger)
-    extends XClassFileManager {
+      extends XClassFileManager {
     val tempDir = tempDir0.getCanonicalFile
     IO.delete(tempDir)
     IO.createDirectory(tempDir)
@@ -140,7 +146,7 @@ object ClassFileManager {
     val backedUpJar: Option[Path] = {
       if (Files.exists(outputJar)) {
         val backupPath = outputJar.resolveSibling(s"${outputJar.getFileName}.bak")
-        Files.copy(outputJar, backupPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+        Files.copy(outputJar, backupPath, StandardCopyOption.REPLACE_EXISTING)
         Some(backupPath)
       } else {
         None
@@ -158,7 +164,8 @@ object ClassFileManager {
 
     override def complete(success: Boolean): Unit = {
       if (!success) {
-        backedUpJar.foreach(backup => Files.move(backup, outputJar, StandardCopyOption.REPLACE_EXISTING))
+        backedUpJar.foreach(backup =>
+          Files.move(backup, outputJar, StandardCopyOption.REPLACE_EXISTING))
       }
     }
   }

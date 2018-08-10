@@ -13,7 +13,13 @@ import java.io.File
 
 import sbt.util.{ Logger, Level }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
-import xsbti.compile.{ DependencyChanges, IncOptions, CompileAnalysis, Output, ClassFileManager => XClassFileManager }
+import xsbti.compile.{
+  DependencyChanges,
+  IncOptions,
+  CompileAnalysis,
+  Output,
+  ClassFileManager => XClassFileManager
+}
 
 /**
  * Define helpers to run incremental compilation algorithm with name hashing.
@@ -132,8 +138,10 @@ object Incremental {
     previous -- invalidatedSrcs
   }
 
-  private[this] def manageClassfiles[T](options: IncOptions, output: Output)(run: XClassFileManager => T): T = {
-    val classfileManager = STJ.extractJarOutput(output)
+  private[this] def manageClassfiles[T](options: IncOptions, output: Output)(
+      run: XClassFileManager => T): T = {
+    val classfileManager = STJ
+      .extractJarOutput(output)
       .map(ClassFileManager.jarBasedTransactional)
       .getOrElse(ClassFileManager.getClassFileManager(options))
 
