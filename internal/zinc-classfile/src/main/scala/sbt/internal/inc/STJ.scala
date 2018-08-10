@@ -18,18 +18,14 @@ import xsbti.compile.{ Output, SingleOutput }
 
 object STJ extends PathFunctions with Debugging {
 
+  def includeInJar(jar: File, files: Seq[(File, RelClass)]): Unit = {
+    IndexBasedZipFsOps.includeInJar(jar, files)
+  }
+
   // puts all files in `from` (overriding the original files in case of conflicts)
   // into `to`, removing `from`. In other words it merges `from` into `into`.
   def mergeJars(into: File, from: File): Unit = {
     IndexBasedZipFsOps.mergeArchives(into, from)
-  }
-
-  def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
-    JavaZipOps.withZipFs(uri, create)(action)
-  }
-
-  def withZipFs[A](file: File, create: Boolean = false)(action: FileSystem => A): A = {
-    withZipFs(fileToJarUri(file), create)(action)
   }
 
   def createCachedStampReader(): File => Long = {
@@ -43,25 +39,10 @@ object STJ extends PathFunctions with Debugging {
       }
   }
 
-  def readModifiedTimeFromJar(jc: JaredClass): Long = {
-    val (jar, cls) = toJarAndRelClass(jc)
-    if (jar.exists()) {
-      withZipFs(jar) { fs =>
-        val path = fs.getPath(cls)
-        if (Files.exists(path)) {
-          Files.getLastModifiedTime(path).toMillis
-        } else 0
-      }
-    } else 0
-  }
-
-  def existsInJar(s: JaredClass): Boolean = {
-    val (jar, cls) = toJarAndRelClass(s)
-    jar.exists() && {
-      val file = new ZipFile(jar, ZipFile.OPEN_READ)
-      val entryExists = file.getEntry(cls) != null
-      file.close()
-      entryExists
+  def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
+    val jarFile = jarUriToFile(jar)
+    if (jarFile.exists()) {
+      IndexBasedZipFsOps.removeEntries(jarFile, classes)
     }
   }
 
@@ -95,14 +76,27 @@ object STJ extends PathFunctions with Debugging {
       }
   }
 
-  def removeFromJar(jar: URI, classes: Iterable[RelClass]): Unit = {
-    val jarFile = jarUriToFile(jar)
-    if (jarFile.exists()) {
-      IndexBasedZipFsOps.removeEntries(jarFile, classes)
+  // used in cfm for copying
+  def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
+    JavaZipOps.withZipFs(uri, create)(action)
+  }
+
+  // in cfm
+  def existsInJar(s: JaredClass): Boolean = {
+    val (jar, cls) = toJarAndRelClass(s)
+    jar.exists() && {
+      val file = new ZipFile(jar, ZipFile.OPEN_READ)
+      val entryExists = file.getEntry(cls) != null
+      file.close()
+      entryExists
     }
   }
 
   // used only in tests
+  def withZipFs[A](file: File, create: Boolean = false)(action: FileSystem => A): A = {
+    withZipFs(fileToJarUri(file), create)(action)
+  }
+
   def listFiles(f: File): Seq[String] = {
     if (f.exists()) {
       withZipFs(f) { fs =>
@@ -115,6 +109,18 @@ object STJ extends PathFunctions with Debugging {
         list.map(_.toString)
       }
     } else Nil
+  }
+
+  def readModifiedTimeFromJar(jc: JaredClass): Long = {
+    val (jar, cls) = toJarAndRelClass(jc)
+    if (jar.exists()) {
+      withZipFs(jar) { fs =>
+        val path = fs.getPath(cls)
+        if (Files.exists(path)) {
+          Files.getLastModifiedTime(path).toMillis
+        } else 0
+      }
+    } else 0
   }
 
 }
@@ -194,8 +200,8 @@ sealed trait PathFunctions {
 
   def isJar(file: File): Boolean = {
     file.getPath.split("!") match {
-      case Array(jar, cls) => jar.endsWith(".jar")
-      case _               => false
+      case Array(jar, cls @ _) => jar.endsWith(".jar")
+      case _                   => false
     }
   }
 

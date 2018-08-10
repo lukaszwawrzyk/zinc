@@ -121,27 +121,7 @@ final class MixedAnalyzingCompiler(
                 config.progress
               )
 
-              import sbt.io.syntax._
-              val classes = (outputDir ** -DirectoryFilter).get.flatMap { classFile =>
-                IO.relativize(outputDir, classFile) match {
-                  case Some(relPath) =>
-                    List((classFile, relPath))
-                  case _ => Nil
-                }
-              }
-
-              STJ.withZipFs(outputJar, create = true) { fs =>
-                classes.foreach {
-                  case (classFile, target) =>
-                    val targetPath = fs.getPath(target)
-                    Option(targetPath.getParent).foreach(Files.createDirectories(_))
-                    Files.copy(classFile.toPath,
-                               targetPath,
-                               StandardCopyOption.REPLACE_EXISTING,
-                               StandardCopyOption.COPY_ATTRIBUTES)
-                }
-              }
-              IO.delete(outputDir)
+              putJavacOutputInJar(outputJar, outputDir)
             case None =>
               javac(identity).compile(
                 javaSrcs,
@@ -169,6 +149,22 @@ final class MixedAnalyzingCompiler(
 
     if (javaSrcs.size + scalaSrcs.size > 0)
       log.info("Done compiling.")
+  }
+
+  private def putJavacOutputInJar(outputJar: File, outputDir: File): Unit = {
+    import sbt.io.syntax._
+    val compiledClasses = (outputDir ** -DirectoryFilter).get.flatMap { classFile =>
+      IO.relativize(outputDir, classFile) match {
+        case Some(relPath) =>
+          List((classFile, relPath))
+        case _ => Nil
+      }
+    }
+
+    if (compiledClasses.nonEmpty) {
+      STJ.includeInJar(outputJar, compiledClasses)
+    }
+    IO.delete(outputDir)
   }
 
   private def toAbsolute(extraClasspath: Seq[File]) = {

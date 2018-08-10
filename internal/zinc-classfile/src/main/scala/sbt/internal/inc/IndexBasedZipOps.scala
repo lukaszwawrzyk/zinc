@@ -3,8 +3,12 @@ package sbt.internal.inc
 import java.nio.channels.{ FileChannel, Channels, ReadableByteChannel }
 import java.io._
 import java.nio.file.{ Files, Path }
+import java.util.UUID
+import java.util.zip.{ Deflater, ZipOutputStream, ZipEntry }
 
-trait IndexBasedZipOps {
+import sbt.io.{ IO, Using }
+
+trait IndexBasedZipOps extends CreateZip {
 
   class CachedStampReader {
     private var cachedNameToTimestamp: Map[String, Long] = _
@@ -38,6 +42,16 @@ trait IndexBasedZipOps {
 
   def mergeArchives(into: File, from: File): Unit = {
     mergeArchives(into.toPath, from.toPath)
+  }
+
+  def includeInJar(jar: File, files: Seq[(File, String)]): Unit = {
+    if (jar.exists()) {
+      val tempZip = jar.toPath.resolveSibling(s"${UUID.randomUUID()}.jar").toFile
+      createZip(tempZip, files)
+      mergeArchives(jar, tempZip)
+    } else {
+      createZip(jar, files)
+    }
   }
 
   type Metadata
@@ -164,5 +178,45 @@ trait IndexBasedZipOps {
   protected def getLastModifiedTime(header: Header): Long
 
   protected def dumpMetadata(metadata: Metadata, outputStream: OutputStream): Unit
+
+}
+
+trait CreateZip {
+
+  def createZip(target: File, files: Seq[(File, String)]): Unit = {
+    withZipOutput(target) { output =>
+      writeZip(files, output)
+    }
+  }
+
+  private def withZipOutput(file: File)(f: ZipOutputStream => Unit): Unit = {
+    Using.fileOutputStream(false)(file) { fileOut =>
+      val zipOut = new ZipOutputStream(fileOut)
+      zipOut.setMethod(ZipOutputStream.DEFLATED)
+      zipOut.setLevel(Deflater.NO_COMPRESSION)
+      try { f(zipOut) } finally { zipOut.close() }
+    }
+  }
+
+  private def writeZip(files: Seq[(File, String)], output: ZipOutputStream): Unit = {
+    def makeFileEntry(file: File, name: String): ZipEntry = {
+      val e = new ZipEntry(name)
+      e.setTime(IO.getModifiedTimeOrZero(file))
+      e
+    }
+
+    def addFileEntry(file: File, name: String): Unit = {
+      output.putNextEntry(makeFileEntry(file, name))
+      IO.transfer(file, output)
+      output.closeEntry()
+    }
+
+    files.foreach { case (file, name) => addFileEntry(file, normalizeName(name)) }
+  }
+
+  private def normalizeName(name: String): String = {
+    val sep = File.separatorChar
+    if (sep == '/') name else name.replace(sep, '/')
+  }
 
 }
