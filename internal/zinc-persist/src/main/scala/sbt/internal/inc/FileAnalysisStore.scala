@@ -11,7 +11,7 @@ package inc
 
 import java.io._
 import java.util.Optional
-import java.util.zip.{ ZipEntry, ZipInputStream }
+import java.util.zip.{ ZipEntry, ZipInputStream, Deflater, ZipOutputStream }
 
 import com.google.protobuf.{ CodedInputStream, CodedOutputStream }
 import sbt.internal.inc.binary.BinaryAnalysisFormat
@@ -81,6 +81,10 @@ object FileAnalysisStore {
 
       val outputStream = new FileOutputStream(tmpAnalysisFile)
       Using.zipOutputStream(outputStream) { outputStream =>
+        // TODO allow to disable compression with a flag
+        outputStream.setMethod(ZipOutputStream.DEFLATED)
+        outputStream.setLevel(Deflater.NO_COMPRESSION)
+
         val protobufWriter = CodedOutputStream.newInstance(outputStream)
         outputStream.putNextEntry(new ZipEntry(analysisFileName))
         format.write(protobufWriter, analysis, setup)
