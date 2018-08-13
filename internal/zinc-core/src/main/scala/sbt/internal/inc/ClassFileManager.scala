@@ -89,7 +89,7 @@ object ClassFileManager {
     new TransactionalClassFileManager(tempDir0, logger)
 
   def jarBasedTransactional(outputJar: File): XClassFileManager = {
-    new JarBasedTransactionalClassFileManager(outputJar.toPath)
+    new JarBasedTransactionalClassFileManager(outputJar)
   }
 
   private final class TransactionalClassFileManager(tempDir0: File, logger: sbt.util.Logger)
@@ -141,30 +141,21 @@ object ClassFileManager {
     }
   }
 
-  private final class JarBasedTransactionalClassFileManager(outputJar: Path)
+  private final class JarBasedTransactionalClassFileManager(outputJar: File)
       extends XClassFileManager {
 
-    val backedUpJar: Option[Path] = {
-      if (Files.exists(outputJar)) {
-        val backupPath = outputJar.resolveSibling(s"${outputJar.getFileName}.bak")
-        Files.copy(outputJar, backupPath, StandardCopyOption.REPLACE_EXISTING)
-        Some(backupPath)
-      } else {
-        None
-      }
-    }
+    val backedUpIndex = Some(outputJar).filter(_.exists()).map(STJ.stashIndex)
 
     override def delete(jaredClasses: Array[File]): Unit = {
       val classes = jaredClasses.map(s => STJ.toRelClass(s.toString))
-      STJ.removeFromJar(outputJar.toFile, classes)
+      STJ.removeFromJar(outputJar, classes)
     }
 
     override def generated(classes: Array[File]): Unit = ()
 
     override def complete(success: Boolean): Unit = {
       if (!success) {
-        backedUpJar.foreach(backup =>
-          Files.move(backup, outputJar, StandardCopyOption.REPLACE_EXISTING))
+        backedUpIndex.foreach(index => STJ.unstashIndex(outputJar, index))
       }
     }
   }

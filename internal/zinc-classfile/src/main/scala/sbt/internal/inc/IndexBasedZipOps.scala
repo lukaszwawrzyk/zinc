@@ -32,10 +32,6 @@ trait IndexBasedZipOps extends CreateZip {
     }
   }
 
-  def readCentralDirectory(jar: File): Unit = {
-    readMetadata(jar.toPath)
-  }
-
   def removeEntries(jarFile: File, classes: Iterable[String]): Unit = {
     val cleanPaths = classes.map(_.replace("\\", "/").stripPrefix("/"))
     removeEntries(jarFile.toPath, cleanPaths.toSet)
@@ -55,17 +51,32 @@ trait IndexBasedZipOps extends CreateZip {
     }
   }
 
+  def readCentralDir(file: File): Metadata = {
+    readMetadata(file.toPath)
+  }
+
+  def writeCentralDir(file: File, centralDir: Metadata): Unit = {
+    storeMetadata(file.toPath, centralDir)
+  }
+
   type Metadata
   type Header
 
-  protected def removeEntries(path: Path, toRemove: Set[String]): Unit = {
+  private def storeMetadata(path: Path, newMetadata: Metadata): Unit = {
+    val currentMetadata = readMetadata(path)
+    val currentCentralDirStart = truncateMetadata(currentMetadata, path)
+    setCentralDirStart(newMetadata, currentCentralDirStart)
+    finalizeZip(newMetadata, path, currentCentralDirStart)
+  }
+
+  private def removeEntries(path: Path, toRemove: Set[String]): Unit = {
     val metadata = readMetadata(path)
     removeEntriesFromMetadata(metadata, toRemove)
     val writeOffset = truncateMetadata(metadata, path)
     finalizeZip(metadata, path, writeOffset)
   }
 
-  protected def removeEntriesFromMetadata(metadata: Metadata, toRemove: Set[String]): Unit = {
+  private def removeEntriesFromMetadata(metadata: Metadata, toRemove: Set[String]): Unit = {
     val headers = getHeaders(metadata)
     val sanitizedToRemove = toRemove.map(_.stripPrefix("/"))
     val clearedHeaders =
@@ -73,7 +84,7 @@ trait IndexBasedZipOps extends CreateZip {
     setHeaders(metadata, clearedHeaders)
   }
 
-  protected def mergeArchives(target: Path, source: Path): Unit = {
+  private def mergeArchives(target: Path, source: Path): Unit = {
     val targetMetadata = readMetadata(target)
     val sourceMetadata = readMetadata(source)
 
@@ -95,7 +106,7 @@ trait IndexBasedZipOps extends CreateZip {
     Files.delete(source)
   }
 
-  protected def mergeHeaders(
+  private def mergeHeaders(
       targetModel: Metadata,
       sourceModel: Metadata,
       sourceStart: Long
@@ -125,7 +136,7 @@ trait IndexBasedZipOps extends CreateZip {
     sizeAfterTruncate
   }
 
-  protected def finalizeZip(
+  private def finalizeZip(
       metadata: Metadata,
       path: Path,
       metadataStart: Long
@@ -137,7 +148,7 @@ trait IndexBasedZipOps extends CreateZip {
     outputStream.close()
   }
 
-  protected def transferAll(
+  private def transferAll(
       source: Path,
       target: Path,
       startPos: Long,
@@ -157,11 +168,11 @@ trait IndexBasedZipOps extends CreateZip {
     targetFile.close()
   }
 
-  protected def openFileForReading(path: Path): ReadableByteChannel = {
+  private def openFileForReading(path: Path): ReadableByteChannel = {
     Channels.newChannel(new BufferedInputStream(Files.newInputStream(path)))
   }
 
-  protected def openFileForWriting(path: Path): FileChannel = {
+  private def openFileForWriting(path: Path): FileChannel = {
     new FileOutputStream(path.toFile, true).getChannel
   }
 
