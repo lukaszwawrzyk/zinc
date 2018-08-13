@@ -127,8 +127,16 @@ object Incremental {
   private[inc] def apiDebug(options: IncOptions): Boolean =
     options.apiDebug || java.lang.Boolean.getBoolean(apiDebugProp)
 
-  private[sbt] def prune(invalidatedSrcs: Set[File], previous: CompileAnalysis): Analysis =
-    prune(invalidatedSrcs, previous, ClassFileManager.deleteImmediately)
+  private[sbt] def prune(invalidatedSrcs: Set[File],
+                         previous: CompileAnalysis,
+                         output: Output): Analysis = {
+    val classFileManager = STJ
+      .extractJarOutput(output)
+      .map(ClassFileManager.deleteImmediatelyFromJar)
+      .getOrElse(ClassFileManager.deleteImmediately)
+
+    prune(invalidatedSrcs, previous, classFileManager)
+  }
 
   private[sbt] def prune(invalidatedSrcs: Set[File],
                          previous0: CompileAnalysis,
@@ -142,7 +150,7 @@ object Incremental {
       run: XClassFileManager => T): T = {
     val classfileManager = STJ
       .extractJarOutput(output)
-      .map(ClassFileManager.jarBasedTransactional)
+      .map(ClassFileManager.transactionalForJar)
       .getOrElse(ClassFileManager.getClassFileManager(options))
 
     val result = try run(classfileManager)

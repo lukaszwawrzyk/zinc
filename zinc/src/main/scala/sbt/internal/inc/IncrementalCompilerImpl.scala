@@ -316,9 +316,9 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
           previousAnalysis
         else if (!equivPairs.equiv(previous.extra, currentSetup.extra))
           Analysis.empty
-        else Incremental.prune(srcsSet, previousAnalysis)
+        else Incremental.prune(srcsSet, previousAnalysis, output)
       case None =>
-        Incremental.prune(srcsSet, previousAnalysis)
+        Incremental.prune(srcsSet, previousAnalysis, output)
     }
 
     // Run the incremental compilation

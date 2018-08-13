@@ -49,32 +49,15 @@ object ClassFileManager {
     override def complete(success: Boolean): Unit = ()
   }
 
-  // todo merge with above class
-  private final class JaredDeleteClassFileManager extends XClassFileManager {
-    override def delete(classes: Array[File]): Unit = {
-      groupByJars(classes.map(_.toString)).foreach {
-        case (jar, classes) =>
-          STJ.removeFromJar(jar, classes)
-      }
-    }
-    override def generated(classes: Array[File]): Unit = ()
-    override def complete(success: Boolean): Unit = ()
-
-    private def groupByJars(jared: Iterable[STJ.JaredClass]): Map[File, Iterable[STJ.RelClass]] = {
-      jared
-        .map(jc => STJ.toJarAndRelClass(jc))
-        .groupBy(_._1)
-        .mapValues(_.map(_._2))
-    }
-
-  }
-
   /**
    * Constructs a minimal [[ClassFileManager]] implementation that immediately deletes
    * class files when they are requested. This is the default implementation of the class
    * file manager by the Scala incremental compiler if no class file manager is specified.
    */
   def deleteImmediately: XClassFileManager = new DeleteClassFileManager
+
+  def deleteImmediatelyFromJar(outputJar: File): XClassFileManager =
+    new DeleteClassFileManagerForJar(outputJar)
 
   /**
    * Constructs a transactional [[ClassFileManager]] implementation that restores class
@@ -86,8 +69,8 @@ object ClassFileManager {
   def transactional(tempDir0: File, logger: sbt.util.Logger): XClassFileManager =
     new TransactionalClassFileManager(tempDir0, logger)
 
-  def jarBasedTransactional(outputJar: File): XClassFileManager = {
-    new JarBasedTransactionalClassFileManager(outputJar)
+  def transactionalForJar(outputJar: File): XClassFileManager = {
+    new TransactionalClassFileManagerForJar(outputJar)
   }
 
   private final class TransactionalClassFileManager(tempDir0: File, logger: sbt.util.Logger)
@@ -139,10 +122,19 @@ object ClassFileManager {
     }
   }
 
-  private final class JarBasedTransactionalClassFileManager(outputJar: File)
+  private final class DeleteClassFileManagerForJar(outputJar: File) extends XClassFileManager {
+    override def delete(classes: Array[File]): Unit = {
+      val relClasses = classes.map(c => STJ.toRelClass(c.toString))
+      STJ.removeFromJar(outputJar, relClasses)
+    }
+    override def generated(classes: Array[File]): Unit = ()
+    override def complete(success: Boolean): Unit = ()
+  }
+
+  private final class TransactionalClassFileManagerForJar(outputJar: File)
       extends XClassFileManager {
 
-    val backedUpIndex = Some(outputJar).filter(_.exists()).map(STJ.stashIndex)
+    private val backedUpIndex = Some(outputJar).filter(_.exists()).map(STJ.stashIndex)
 
     override def delete(jaredClasses: Array[File]): Unit = {
       val classes = jaredClasses.map(s => STJ.toRelClass(s.toString))
