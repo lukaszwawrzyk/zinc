@@ -9,7 +9,6 @@ import java.io.File
 import scala.collection.mutable.ListBuffer
 import java.util.function.Consumer
 import java.nio.file._
-
 import java.util.UUID
 
 import sbt.io.IO.FileScheme
@@ -17,6 +16,14 @@ import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 
 object STJ extends PathFunctions with Debugging {
+
+  def stashIndex(jar: File): IndexBasedZipFsOps.Metadata = {
+    IndexBasedZipFsOps.readCentralDir(jar)
+  }
+
+  def unstashIndex(jar: File, index: IndexBasedZipFsOps.Metadata): Unit = {
+    IndexBasedZipFsOps.writeCentralDir(jar, index)
+  }
 
   def includeInJar(jar: File, files: Seq[(File, RelClass)]): Unit = {
     IndexBasedZipFsOps.includeInJar(jar, files)
