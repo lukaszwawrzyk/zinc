@@ -53,7 +53,7 @@ object STJ extends PathFunctions with Debugging {
   }
 
   def withPreviousJar[A](output: Output)(compile: /*extra cp: */ Seq[File] => A): A = {
-    extractJarOutput(output)
+    toJarOutput(output)
       .map { outputJar =>
         val prevJarName = outputJar.getName.replace(".jar", "_prev.jar")
         val prevJar = outputJar.toPath.resolveSibling(prevJarName).toFile
@@ -227,10 +227,10 @@ sealed trait PathFunctions {
   }
 
   def isEnabled(output: Output): Boolean = {
-    extractJarOutput(output).isDefined
+    toJarOutput(output).isDefined
   }
 
-  def extractJarOutput(output: Output): Option[File] = {
+  def toJarOutput(output: Output): Option[File] = {
     output match {
       case s: SingleOutput =>
         val out = s.getOutputDirectory
@@ -279,7 +279,7 @@ sealed trait Debugging { this: PathFunctions =>
 
   // fails if file is currently open
   def touchOutputFile(output: Output, msg: String): Unit = {
-    extractJarOutput(output).foreach { jarOut =>
+    toJarOutput(output).foreach { jarOut =>
       if (jarOut.exists()) {
         System.out.flush()
         println("$$$ ??? " + msg)

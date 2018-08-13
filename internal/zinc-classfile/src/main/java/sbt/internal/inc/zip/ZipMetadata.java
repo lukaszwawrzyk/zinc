@@ -64,11 +64,10 @@ import static sbt.internal.inc.zip.ZipUtils.*;
 // read index (central directory), modify it and write at specified offset
 public class ZipMetadata {
 
-    final byte[] cen; // CEN & ENDHDR
+    private final byte[] cen; // CEN & ENDHDR
     private END end;
     private final SeekableByteChannel ch;
     private LinkedHashMap<IndexNode, IndexNode> inodes;
-    private long locpos;   // position of first LOC header (usually 0)
     private static byte[] ROOTPATH = new byte[0];
     private final IndexNode LOOKUPKEY = IndexNode.keyOf(null);
     private List<Entry> elist;
@@ -126,6 +125,8 @@ public class ZipMetadata {
     // Always pass in -1 for knownTotal; it's used for a recursive call.
     private byte[] initCEN() throws IOException {
         end = findEND();
+        // position of first LOC header (usually 0)
+        long locpos;
         if (end.endpos == 0) {
             inodes = new LinkedHashMap<>(10);
             locpos = 0;
@@ -256,7 +257,7 @@ public class ZipMetadata {
             this.pos = pos;
         }
 
-        final static IndexNode keyOf(byte[] name) { // get a lookup key;
+        static IndexNode keyOf(byte[] name) { // get a lookup key;
             return new IndexNode(name, -1);
         }
 
@@ -297,7 +298,7 @@ public class ZipMetadata {
         throw new ZipError(msg);
     }
 
-    private void buildNodeTree() throws IOException {
+    private void buildNodeTree() {
         HashSet<IndexNode> dirs = new HashSet<>();
         IndexNode root = new IndexNode(ROOTPATH, -1);
         inodes.put(root, root);
@@ -362,8 +363,6 @@ public class ZipMetadata {
 
     // End of central directory record
     static class END {
-        int  disknum;
-        int  sdisknum;
         int  endsub;     // endsub
         int  centot;     // 4 bytes
         long cenlen;     // 4 bytes
@@ -372,9 +371,7 @@ public class ZipMetadata {
         byte[] comment;
 
         /* members of Zip64 end of central directory locator */
-        int diskNum;
         long endpos;
-        int disktot;
 
         void write(OutputStream os, long offset) throws IOException {
             boolean hasZip64 = false;
@@ -430,16 +427,6 @@ public class ZipMetadata {
     }
 
     public static class Entry extends IndexNode {
-
-        static final int CEN    = 1;    // entry read from cen
-        static final int NEW    = 2;    // updated contents in bytes or file
-        static final int FILECH = 3;    // fch update in "file"
-        static final int COPY   = 4;    // copy of a CEN entry
-
-
-        byte[] bytes;      // updated content bytes
-        Path   file;       // use tmp file to store bytes;
-        int    type = CEN; // default is the entry read from cen
 
         // entry attributes
         int    version;
@@ -529,7 +516,6 @@ public class ZipMetadata {
 
         int writeCEN(OutputStream os) throws IOException
         {
-            int written  = CENHDR;
             int version0 = version();
             long csize0  = csize;
             long size0   = size;

@@ -23,6 +23,16 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
     override def description =
       "Finds concrete instances of provided superclasses, and application entry points."
     def name = Analyzer.name
+
+    private lazy val existingClassFiles: Set[STJ.JaredClass] = {
+      STJ.outputJar
+        .map { jar =>
+          val classes = STJ.listFiles(jar)
+          classes.map(STJ.init(jar, _))
+        }
+        .getOrElse(Set.empty)
+    }
+
     def apply(unit: CompilationUnit): Unit = {
       if (!unit.isJava) {
         val sourceFile = unit.source.file.file
@@ -30,8 +40,13 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         for (iclass <- unit.icode) {
           val sym = iclass.symbol
           def addGenerated(separatorRequired: Boolean): Unit = {
-            locatePlainClassFile(sym, separatorRequired)
-              .orElse(locateClassInJar(sym, separatorRequired))
+            val locatedClass = if (STJ.enabled) {
+              locateClassInJar(sym, separatorRequired)
+            } else {
+              locatePlainClassFile(sym, separatorRequired)
+            }
+
+            locatedClass
               .foreach { classFile =>
                 assert(sym.isClass, s"${sym.fullName} is not a class")
                 // we would like to use Symbol.isLocalClass but that relies on Symbol.owner which
@@ -62,26 +77,24 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
         }
       }
     }
-  }
 
-  private def locatePlainClassFile(sym: Symbol, separatorRequired: Boolean): Option[File] = {
-    outputDirs
-      .map(fileForClass(_, sym, separatorRequired))
-      .find(_.exists)
-  }
+    private def locatePlainClassFile(sym: Symbol, separatorRequired: Boolean): Option[File] = {
+      outputDirs
+        .map(fileForClass(_, sym, separatorRequired))
+        .find(_.exists())
+    }
 
-  private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
-    outputDirs.flatMap { jarFile =>
+    private def locateClassInJar(sym: Symbol, separatorRequired: Boolean): Option[File] = {
       val classFile =
         fileForClass(new java.io.File("."), sym, separatorRequired).toString
           .drop(2) // stripPrefix ./ or .\
-      val jaredClass = STJ.init(jarFile, classFile)
-      if (STJ.existsInJar(jaredClass)) {
+      val jaredClass = STJ.init(classFile)
+      if (existingClassFiles.contains(jaredClass)) {
         Some(new File(jaredClass))
       } else {
         None
       }
-    }.headOption
+    }
   }
 
   private object STJ {
@@ -96,25 +109,28 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       s"$jar!$classPath"
     }
 
-    def toJarAndRelClass(c: JaredClass): (File, RelClass) = {
-      val Array(jar, relClass) = c.split("!")
-      // paths within jars always have forward slashes but JaredClass has system defined slashes
-      // because it is often stored in File that controls the slashes
-      val fixedRelClass = relClass.replace("\\", "/")
-      (new File(jar), fixedRelClass)
+    def init(cls: RelClass): JaredClass = {
+      init(STJ.outputJar.get, cls)
     }
 
-    def existsInJar(s: JaredClass): Boolean = {
-      val (jar, cls) = toJarAndRelClass(s)
-      if (jar.exists()) {
-        val file = new ZipFile(jar, ZipFile.OPEN_READ)
-        val exists = file.getEntry(cls) != null
-        file.close()
-        exists
-      } else {
-        false
+    def listFiles(jar: File): Set[RelClass] = {
+      import scala.collection.JavaConverters._
+      // ZipFile is slightly slower than IndexBasedZipFsOps but still almost twice as fast
+      // as plain ZipFileSystem. It is quite difficult to use java code in compiler bridge.
+      val zip = new ZipFile(jar)
+      val paths = zip.entries().asScala.filterNot(_.isDirectory).map(_.getName).toSet
+      zip.close()
+      paths
+    }
+
+    val outputJar: Option[File] = {
+      outputDirs match {
+        case Seq(file) if file.getName.endsWith("jar") => Some(file)
+        case _                                         => None
       }
     }
+
+    val enabled: Boolean = outputJar.isDefined
   }
 
 }
