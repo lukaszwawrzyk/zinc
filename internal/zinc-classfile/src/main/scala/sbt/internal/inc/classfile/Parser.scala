@@ -32,7 +32,7 @@ private[sbt] object Parser {
   def apply(url: URL): ClassFile =
     usingUrlInputStreamWithoutCaching(url)(parse(url.toString)).right.get
 
-  val usingUrlInputStreamWithoutCaching = Using.resource((u: URL) =>
+  private val usingUrlInputStreamWithoutCaching = Using.resource((u: URL) =>
     ErrorHandling.translate("Error opening " + u + ": ") {
       val urlConnection = u.openConnection()
       urlConnection.setUseCaches(false)

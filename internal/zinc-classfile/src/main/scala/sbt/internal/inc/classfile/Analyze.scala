@@ -73,9 +73,6 @@ private[sbt] object Analyze {
 
       val srcClassName = loadEnclosingClass(loadedClass)
 
-      // If straight to jar is enabled, we want to convert the class file that will
-      // go to a temporary directory into a STJ.JaredClass representing the target
-      // location of this class in the output jar.
       val finalClassFile = resolveFinalClassFile(newClass, output, finalJarOutput)
       srcClassName match {
         case Some(className) =>
@@ -133,8 +130,6 @@ private[sbt] object Analyze {
               } else {
                 val cachedOrigin = classfilesCache.get(onBinaryName)
                 for (file <- cachedOrigin.orElse(loadFromClassloader())) {
-                  // binary dependency from a ClassLoader is also a path to class in temporary directory
-                  // that in case of straight to jar compilation has to be converted to final output
                   val binaryFile = resolveFinalClassFile(file, output, finalJarOutput)
                   analysis.binaryDependency(binaryFile,
                                             onBinaryName,
@@ -187,6 +182,11 @@ private[sbt] object Analyze {
     }
   }
 
+  // Classes are compiled to a temporary directory because javac cannot compile to jar directly.
+  // The paths to class files that can be observed here through file system or class loaders
+  // are located there, but as the output will be eventually included in the output jar, as the
+  // output of the analysis we want the final paths like output.jar!A.class.
+  // This method performs the required conversion.
   private def resolveFinalClassFile(realClassFile: File,
                                     output: Output,
                                     finalJarOutput: Option[File]): File = {

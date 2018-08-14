@@ -6,7 +6,7 @@ package classfile
 import java.io.File
 import java.net.URLClassLoader
 
-import javax.tools.{ ToolProvider, StandardLocation }
+import javax.tools.{ StandardLocation, ToolProvider }
 import sbt.io.IO
 import sbt.internal.util.ConsoleLogger
 import xsbti.api.DependencyContext._
@@ -63,10 +63,7 @@ object JavaCompilerForUnitTesting {
       // - extract all base classes.
       // we extract just parents as this is enough for testing
 
-      val output = new SingleOutput {
-        def getOutputDirectory = classesDir
-        override def toString = s"SingleOutput($getOutputDirectory)"
-      }
+      val output = new SingleOutput { def getOutputDirectory: File = classesDir }
       Analyze(classFiles, srcFiles, logger, output, finalJarOutput = None)(
         analysisCallback,
         classloader,

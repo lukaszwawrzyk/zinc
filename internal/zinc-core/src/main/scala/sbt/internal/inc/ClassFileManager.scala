@@ -133,7 +133,6 @@ object ClassFileManager {
 
   private final class TransactionalClassFileManagerForJar(outputJar: File)
       extends XClassFileManager {
-
     private val backedUpIndex = Some(outputJar).filter(_.exists()).map(STJ.stashIndex)
 
     override def delete(jaredClasses: Array[File]): Unit = {
