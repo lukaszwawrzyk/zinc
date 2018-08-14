@@ -6,15 +6,13 @@ import sbt.io.IO
 import java.util.zip.ZipFile
 import java.io.File
 
-import java.nio.file._
-import java.util.UUID
 import scala.collection.JavaConverters._
 
 import sbt.io.IO.FileScheme
 import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 
-object STJ extends PathFunctions with Debugging with ForTestCode {
+object STJ extends PathFunctions with ForTestCode {
 
   def stashIndex(jar: File): IndexBasedZipFsOps.CentralDir = {
     IndexBasedZipFsOps.readCentralDir(jar)
@@ -160,30 +158,25 @@ sealed trait PathFunctions {
   }
 
   def getRelClass(jc: JaredClass): RelClass = {
-    val Array(_, cls) = jc.split("!")
-    // JaredClass stores this part with File.separatorChar. however actual paths in zips always use '/'
-    cls.replace('\\', '/')
+    toJarAndRelClass(jc)._2
   }
 
   def getJarFile(jc: JaredClass): File = {
-    val Array(jar, _) = jc.split("!")
-    new File(jar)
+    toJarAndRelClass(jc)._1
+  }
+
+  protected def toJarAndRelClass(jc: JaredClass): (File, RelClass) = {
+    val Array(jar, cls) = jc.split("!")
+    // JaredClass stores this part with File.separatorChar, however actual paths in zips always use '/'
+    val relClass = cls.replace('\\', '/')
+    (new File(jar), relClass)
   }
 
   def isJar(file: File): Boolean = {
-    file.getPath.split("!") match {
-      case Array(jar, cls @ _) => jar.endsWith(".jar")
-      case _                   => false
+    file.toString.split("!") match {
+      case Array(jar, _) => jar.endsWith(".jar")
+      case _             => false
     }
-  }
-
-  // important as within zip we have / always and in JaredClass we always have consistent / or \
-  def toJarAndRelClass(c: JaredClass): (File, RelClass) = {
-    val Array(jar, relClass) = c.split("!")
-    // paths within jars always have forward slashes but JaredClass has system defined slashes
-    // because it is often stored in File that controls the slashes
-    val fixedRelClass = relClass.replace("\\", "/")
-    (new File(jar), fixedRelClass)
   }
 
   def isEnabled(output: Output): Boolean = {
@@ -193,25 +186,25 @@ sealed trait PathFunctions {
   def getOutputJar(output: Output): Option[File] = {
     output match {
       case s: SingleOutput =>
-        val out = s.getOutputDirectory
-        if (out.getName.endsWith(".jar")) {
-          Some(out)
-        } else None
+        Some(s.getOutputDirectory).filter(_.getName.endsWith(".jar"))
       case _ => None
     }
-
   }
 
   private val javacOutputSuffix = "-javac-output"
-  def javacOutputDir(outputJar: File): File = {
+  def javacOutputTempDir(outputJar: File): File = {
     val outJarName = outputJar.getName
     val outDirName = outJarName + javacOutputSuffix
     outputJar.toPath.resolveSibling(outDirName).toFile
   }
 
-  def fromJavacOutputDir(file: File): Option[File] = {
-    import scala.collection.JavaConverters._
-    val path = file.toPath
+  // Translates a path to a class compiled by the javac to a temporary directory
+  // into a JaredClass wrapped in a File that points to the final destination
+  // after the output will be included in the output jar.
+  // The path to output jar is encoded in the path to javac temp output directory
+  // by the `javacOutputTempDir` method.
+  def fromJavacOutputDir(classFile: File): Option[File] = {
+    val path = classFile.toPath
     val javacOutputDirComponent = path.asScala.zipWithIndex.find {
       case (component, _) =>
         component.toString.endsWith(javacOutputSuffix)
@@ -224,40 +217,6 @@ sealed trait PathFunctions {
         val relClass = path.subpath(index + 1, path.getNameCount)
         new File(init(outputJarPath.toFile, relClass.toString))
     }
-  }
-
-}
-
-sealed trait Debugging { this: PathFunctions =>
-
-  def touchOutputFile(jar: File, msg: String): Unit = {
-    val output = new SingleOutput {
-      override def getOutputDirectory: File = jar
-    }
-    touchOutputFile(output, msg)
-  }
-
-  // fails if file is currently open
-  def touchOutputFile(output: Output, msg: String): Unit = {
-    getOutputJar(output).foreach { jarOut =>
-      if (jarOut.exists()) {
-        System.out.flush()
-        println("$$$ ??? " + msg)
-        System.out.flush()
-
-        val f = jarOut.toPath.resolveSibling(s"${UUID.randomUUID()}.jar")
-        Files.copy(jarOut.toPath, f)
-        Files.move(f, jarOut.toPath, StandardCopyOption.REPLACE_EXISTING)
-
-        System.out.flush()
-        println(s"$$$$$$ !!! $msg")
-      }
-    }
-  }
-
-  // useful for debuging files
-  def pause(msg: String): Unit = {
-    Console.readLine(msg)
   }
 
 }

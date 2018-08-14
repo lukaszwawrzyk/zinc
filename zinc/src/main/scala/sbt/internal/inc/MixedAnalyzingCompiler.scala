@@ -104,7 +104,7 @@ final class MixedAnalyzingCompiler(
 
           STJ.getOutputJar(output) match {
             case Some(outputJar) =>
-              val outputDir = STJ.javacOutputDir(outputJar)
+              val outputDir = STJ.javacOutputTempDir(outputJar)
               IO.createDirectory(outputDir)
               val compiler = javac { originalCp: Seq[File] =>
                 outputDir +: originalCp
