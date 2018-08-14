@@ -52,8 +52,8 @@ object STJ extends PathFunctions with Debugging {
     }
   }
 
-  def withPreviousJar[A](output: Output)(compile: /*extra cp: */ Seq[File] => A): A = {
-    toJarOutput(output)
+  def withPreviousJar[A](output: Output)(compile: /*extra classpath: */ Seq[File] => A): A = {
+    getOutputJar(output)
       .map { outputJar =>
         val prevJarName = outputJar.getName.replace(".jar", "_prev.jar")
         val prevJar = outputJar.toPath.resolveSibling(prevJarName).toFile
@@ -218,6 +218,7 @@ sealed trait PathFunctions {
     }
   }
 
+  // important as within zip we have / always and in JaredClass we always have consistent / or \
   def toJarAndRelClass(c: JaredClass): (File, RelClass) = {
     val Array(jar, relClass) = c.split("!")
     // paths within jars always have forward slashes but JaredClass has system defined slashes
@@ -227,10 +228,10 @@ sealed trait PathFunctions {
   }
 
   def isEnabled(output: Output): Boolean = {
-    toJarOutput(output).isDefined
+    getOutputJar(output).isDefined
   }
 
-  def toJarOutput(output: Output): Option[File] = {
+  def getOutputJar(output: Output): Option[File] = {
     output match {
       case s: SingleOutput =>
         val out = s.getOutputDirectory
@@ -279,7 +280,7 @@ sealed trait Debugging { this: PathFunctions =>
 
   // fails if file is currently open
   def touchOutputFile(output: Output, msg: String): Unit = {
-    toJarOutput(output).foreach { jarOut =>
+    getOutputJar(output).foreach { jarOut =>
       if (jarOut.exists()) {
         System.out.flush()
         println("$$$ ??? " + msg)

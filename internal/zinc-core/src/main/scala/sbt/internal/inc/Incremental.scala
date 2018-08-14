@@ -131,7 +131,7 @@ object Incremental {
                          previous: CompileAnalysis,
                          output: Output): Analysis = {
     val classFileManager = STJ
-      .toJarOutput(output)
+      .getOutputJar(output)
       .map(ClassFileManager.deleteImmediatelyFromJar)
       .getOrElse(ClassFileManager.deleteImmediately)
 
@@ -149,7 +149,7 @@ object Incremental {
   private[this] def manageClassfiles[T](options: IncOptions, output: Output)(
       run: XClassFileManager => T): T = {
     val classfileManager = STJ
-      .toJarOutput(output)
+      .getOutputJar(output)
       .map(ClassFileManager.transactionalForJar)
       .getOrElse(ClassFileManager.getClassFileManager(options))
 

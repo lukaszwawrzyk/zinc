@@ -102,7 +102,7 @@ final class MixedAnalyzingCompiler(
             )
           val joptions = config.currentSetup.options.javacOptions
 
-          STJ.toJarOutput(output) match {
+          STJ.getOutputJar(output) match {
             case Some(outputJar) =>
               val outputDir = STJ.javacOutputDir(outputJar)
               IO.createDirectory(outputDir)

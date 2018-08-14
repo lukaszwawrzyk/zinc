@@ -192,6 +192,7 @@ trait IndexBasedZipOps extends CreateZip {
 
 }
 
+// Adapted from sbt.io.IO.zip - disabled compression and simplified
 trait CreateZip {
 
   def createZip(target: File, files: Seq[(File, String)]): Unit = {
