@@ -66,7 +66,6 @@ trait IndexBasedZipOps extends CreateZip {
   private def storeMetadata(path: Path, newMetadata: Metadata): Unit = {
     val currentMetadata = readMetadata(path)
     val currentCentralDirStart = truncateMetadata(currentMetadata, path)
-    setCentralDirStart(newMetadata, currentCentralDirStart)
     finalizeZip(newMetadata, path, currentCentralDirStart)
   }
 
@@ -87,9 +86,9 @@ trait IndexBasedZipOps extends CreateZip {
     val targetMetadata = readMetadata(target)
     val sourceMetadata = readMetadata(source)
 
-    // "source" starts where "target" ends
+    // "source" will start where "target" ends
     val sourceStart = truncateMetadata(targetMetadata, target)
-    // "source" is as long as from its beginning till the start of central dir
+    // "source" data (files) is as long as from its beginning till the start of central dir
     val sourceLength = getCentralDirStart(sourceMetadata)
 
     transferAll(source, target, startPos = sourceStart, bytesToTransfer = sourceLength)
@@ -98,8 +97,6 @@ trait IndexBasedZipOps extends CreateZip {
     setHeaders(targetMetadata, mergedHeaders)
 
     val centralDirStart = sourceStart + sourceLength
-    setCentralDirStart(targetMetadata, centralDirStart)
-
     finalizeZip(targetMetadata, target, centralDirStart)
 
     Files.delete(source)
@@ -140,6 +137,7 @@ trait IndexBasedZipOps extends CreateZip {
       path: Path,
       metadataStart: Long
   ): Unit = {
+    setCentralDirStart(metadata, metadataStart)
     val fileOutputStream = new FileOutputStream(path.toFile, true)
     fileOutputStream.getChannel.position(metadataStart)
     val outputStream = new BufferedOutputStream(fileOutputStream)
