@@ -135,8 +135,12 @@ private[sbt] object Analyze {
                 for (file <- cachedOrigin.orElse(loadFromClassloader())) {
                   // binary dependency from a ClassLoader is also a path to class in temporary directory
                   // that in case of straight to jar compilation has to be converted to final output
-                  val binaryFile = STJ.fromJavacOutputDir(file).getOrElse(file)
-                  analysis.binaryDependency(binaryFile, onBinaryName, fromClassName, source, context)
+                  val binaryFile = resolveFinalClassFile(file, output, finalJarOutput)
+                  analysis.binaryDependency(binaryFile,
+                                            onBinaryName,
+                                            fromClassName,
+                                            source,
+                                            context)
                 }
               }
             }
@@ -183,14 +187,14 @@ private[sbt] object Analyze {
     }
   }
 
-  def resolveFinalClassFile(realClassFile: File,
-                            output: Output,
-                            finalJarOutput: Option[File]): File = {
+  private def resolveFinalClassFile(realClassFile: File,
+                                    output: Output,
+                                    finalJarOutput: Option[File]): File = {
     val jaredClass = for {
       outputJar <- finalJarOutput
       outputDir <- Some(output).collect { case s: SingleOutput => s.getOutputDirectory }
+      relativeClass <- IO.relativize(outputDir, realClassFile)
     } yield {
-      val relativeClass = IO.relativize(outputDir, realClassFile).get
       new File(STJ.init(outputJar, relativeClass))
     }
     jaredClass.getOrElse(realClassFile)

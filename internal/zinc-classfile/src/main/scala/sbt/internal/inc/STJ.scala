@@ -190,32 +190,10 @@ sealed trait PathFunctions {
     }
   }
 
-  private val javacOutputSuffix = "-javac-output"
   def javacOutputTempDir(outputJar: File): File = {
     val outJarName = outputJar.getName
-    val outDirName = outJarName + javacOutputSuffix
+    val outDirName = outJarName + "-javac-output"
     outputJar.toPath.resolveSibling(outDirName).toFile
-  }
-
-  // Translates a path to a class compiled by the javac to a temporary directory
-  // into a JaredClass wrapped in a File that points to the final destination
-  // after the output will be included in the output jar.
-  // The path to output jar is encoded in the path to javac temp output directory
-  // by the `javacOutputTempDir` method.
-  def fromJavacOutputDir(classFile: File): Option[File] = {
-    val path = classFile.toPath
-    val javacOutputDirComponent = path.asScala.zipWithIndex.find {
-      case (component, _) =>
-        component.toString.endsWith(javacOutputSuffix)
-    }
-    javacOutputDirComponent map {
-      case (component, index) =>
-        val outputJarName = component.toString.stripSuffix(javacOutputSuffix)
-        val basePath = Stream.iterate(path, path.getNameCount - index + 1)(_.getParent).last
-        val outputJarPath = basePath.resolve(outputJarName)
-        val relClass = path.subpath(index + 1, path.getNameCount)
-        new File(init(outputJarPath.toFile, relClass.toString))
-    }
   }
 
 }
