@@ -5,8 +5,8 @@ package classfile
 
 import java.io.File
 import java.net.URLClassLoader
-
 import javax.tools.{ StandardLocation, ToolProvider }
+
 import sbt.io.IO
 import sbt.internal.util.ConsoleLogger
 import xsbti.api.DependencyContext._

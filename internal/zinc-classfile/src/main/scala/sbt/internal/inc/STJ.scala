@@ -1,14 +1,11 @@
 package sbt.internal.inc
 
-import java.net.URI
-
 import sbt.io.IO
 import java.util.zip.ZipFile
 import java.io.File
 
 import scala.collection.JavaConverters._
 
-import sbt.io.IO.FileScheme
 import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 

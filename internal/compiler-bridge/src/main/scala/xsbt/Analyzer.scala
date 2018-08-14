@@ -101,8 +101,6 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
     type JaredClass = String
     type RelClass = String
 
-    def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
-
     def init(jar: File, cls: RelClass): JaredClass = {
       // This identifier will be stored as a java.io.File. Its constructor will normalize slashes
       // which means that the identifier to be consistent should at all points have consistent

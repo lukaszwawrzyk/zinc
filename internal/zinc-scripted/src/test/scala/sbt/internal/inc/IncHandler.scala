@@ -2,37 +2,37 @@ package sbt
 package internal
 package inc
 
-import java.io.{ FileInputStream, File }
+import java.io.{ File, FileInputStream }
 import java.net.URLClassLoader
 import java.util.jar.Manifest
 
 import sbt.util.Logger
 import sbt.util.InterfaceUtil._
-import sbt.internal.inc.JavaInterfaceUtil.{ EnrichOptional, EnrichOption }
+import sbt.internal.inc.JavaInterfaceUtil.{ EnrichOption, EnrichOptional }
 import xsbt.api.Discovery
 import xsbti.{ Problem, Severity }
 import xsbti.compile.{
   AnalysisContents,
-  IncOptionsUtil,
+  ClasspathOptionsUtil,
   CompileAnalysis,
+  CompileOrder,
+  CompilerCache,
+  DefinesClass,
+  IncOptions,
+  IncOptionsUtil,
   PerClasspathEntryLookup,
   PreviousResult,
-  ClasspathOptionsUtil,
-  DefinesClass,
-  CompileOrder,
-  IncOptions,
-  CompilerCache,
   Compilers => XCompilers
 }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.io.DirectoryFilter
 import java.lang.reflect.Method
-import java.lang.reflect.Modifier.{ isStatic, isPublic }
-import java.util.{ Properties, Optional }
+import java.lang.reflect.Modifier.{ isPublic, isStatic }
+import java.util.{ Optional, Properties }
 
 import sbt.internal.inc.classpath.{ ClassLoaderCache, ClasspathUtilities, ClasspathFilter }
-import sbt.internal.scripted.{ TestFailed, StatementHandler }
+import sbt.internal.scripted.{ StatementHandler, TestFailed }
 import sbt.internal.util.ManagedLogger
 import sjsonnew.support.scalajson.unsafe.{ Converter, Parser => JsonParser }
 
@@ -87,8 +87,9 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
       implicit val projectFormat =
         caseClass(Project.apply _, Project.unapply _)("name", "dependsOn", "in", "scalaVersion")
       implicit val buildFormat = caseClass(Build.apply _, Build.unapply _)("projects")
-      val json =
-        JsonParser.parseFromChannel(new FileInputStream(directory / "build.json").getChannel).get
+      // Do not parseFromFile as it leaves file open, causing problems on Windows.
+      val channel = new FileInputStream(directory / "build.json").getChannel
+      val json = JsonParser.parseFromChannel(channel).get
       Converter.fromJsonUnsafe[Build](json)
     } else Build(projects = Vector(Project(name = RootIdentifier).copy(in = Some(directory))))
   }
@@ -96,7 +97,6 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
   def lookupProject(name: String): ProjectStructure = buildStructure(name)
 
   override def apply(command: String, arguments: List[String], state: State): State = {
-    println(s"Processing > $command ${arguments.mkString(" ")}")
     val splitCommands = command.split("/").toList
     // Note that root does not do aggregation as sbt does.
     val (project, commandToRun) = splitCommands match {
@@ -166,9 +166,8 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
         val analysis = p.compile(i)
         p.discoverMainClasses(Some(analysis.apis)) match {
           case Seq(mainClassName) =>
-            val classpath: Array[File] = ((i.si.allJars :+ p.classesDir) ++ p.outputJar) map {
-              _.getAbsoluteFile
-            }
+            val classpath: Array[File] =
+              ((i.si.allJars :+ p.classesDir) ++ p.outputJar).map(_.getAbsoluteFile)
             val loader = ClasspathUtilities.makeLoader(classpath, i.si, directory)
             try {
               val main = p.getMainMethod(mainClassName, loader)
@@ -178,6 +177,8 @@ final class IncHandler(directory: File, cacheDir: File, scriptedLog: ManagedLogg
                 case f: ClasspathFilter => f.close()
               }
             }
+          case Seq() =>
+            throw new TestFailed(s"Did not find any main class")
           case s =>
             throw new TestFailed(s"Found more than one main class: $s")
         }
@@ -404,19 +405,17 @@ case class ProjectStructure(
 
     val output = outputJar.getOrElse(classesDir)
     val classpath = (i.si.allJars.toList ++ (unmanagedJars :+ output) ++ internalClasspath).toArray
-    val in = compiler.inputs(
-      classpath,
-      sources.toArray,
-      output,
-      scalacOptions,
-      Array(),
-      maxErrors,
-      Array(),
-      CompileOrder.Mixed,
-      cs,
-      setup,
-      prev0
-    )
+    val in = compiler.inputs(classpath,
+                             sources.toArray,
+                             output,
+                             scalacOptions,
+                             Array(),
+                             maxErrors,
+                             Array(),
+                             CompileOrder.Mixed,
+                             cs,
+                             setup,
+                             prev0)
     val result = compiler.compile(in, scriptedLog)
     val analysis = result.analysis match { case a: Analysis => a }
     fileStore.set(AnalysisContents.create(analysis, result.setup))

@@ -11,14 +11,14 @@ package inc
 
 import java.io.File
 
-import sbt.util.{ Logger, Level }
+import sbt.util.{ Level, Logger }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 import xsbti.compile.{
+  ClassFileManager => XClassFileManager,
+  CompileAnalysis,
   DependencyChanges,
   IncOptions,
-  CompileAnalysis,
-  Output,
-  ClassFileManager => XClassFileManager
+  Output
 }
 
 /**
@@ -73,30 +73,23 @@ object Incremental {
     }
     val (initialInvClasses, initialInvSources) =
       incremental.invalidateInitial(previous.relations, initialChanges)
-
-    if (initialInvClasses.nonEmpty || initialInvSources.nonEmpty) {
-      if (initialInvSources == sources) {
-        incremental.log.debug("All sources are invalidated.")
-      } else {
+    if (initialInvClasses.nonEmpty || initialInvSources.nonEmpty)
+      if (initialInvSources == sources) incremental.log.debug("All sources are invalidated.")
+      else
         incremental.log.debug(
           "All initially invalidated classes: " + initialInvClasses + "\n" +
             "All initially invalidated sources: " + initialInvSources + "\n")
-      }
-    }
     val analysis = manageClassfiles(options, output) { classfileManager =>
-      incremental.cycle(
-        initialInvClasses,
-        initialInvSources,
-        sources,
-        binaryChanges,
-        lookup,
-        previous,
-        doCompile(compile, callbackBuilder, classfileManager),
-        classfileManager,
-        1
-      )
+      incremental.cycle(initialInvClasses,
+                        initialInvSources,
+                        sources,
+                        binaryChanges,
+                        lookup,
+                        previous,
+                        doCompile(compile, callbackBuilder, classfileManager),
+                        classfileManager,
+                        1)
     }
-
     (initialInvClasses.nonEmpty || initialInvSources.nonEmpty, analysis)
   }
 

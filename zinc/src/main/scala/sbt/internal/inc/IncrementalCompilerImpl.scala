@@ -44,7 +44,6 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
     val setup = in.setup()
     import config._
     import setup._
-    val output = CompileOutput(classesDirectory)
     val compilers = in.compilers
     val javacChosen = compilers.javaTools.javac
     val scalac = compilers.scalac
@@ -54,7 +53,7 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
       javacChosen,
       sources,
       classpath,
-      output,
+      CompileOutput(classesDirectory),
       cache,
       progress().toOption,
       scalacOptions,
@@ -242,8 +241,6 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         case None           => Analysis.empty
       }
 
-      sys.props.put("sbt.io.jdktimestamps", "true")
-
       val compileStraightToJar = STJ.isEnabled(output)
 
       if (compileStraightToJar) sys.props.put("scala.classpath.closeZip", "true")
@@ -252,9 +249,7 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
         val scalaVersion = scalaCompiler.scalaInstance.version
         if (compileStraightToJar && scalaVersion.startsWith("2.12")) {
           Seq("-YdisableFlatCpCaching")
-        } else {
-          Seq.empty
-        }
+        } else Seq.empty
       }
 
       val extraJavacOptions = if (compileStraightToJar) {

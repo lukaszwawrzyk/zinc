@@ -13,7 +13,7 @@ import java.io.{ File, IOException }
 import java.util
 import java.util.Optional
 
-import sbt.io.{ IO, Hash => IOHash }
+import sbt.io.{ Hash => IOHash }
 import xsbti.compile.analysis.{ ReadStamps, Stamp => XStamp }
 
 import scala.collection.immutable.TreeMap
@@ -141,8 +141,8 @@ object Stamper {
     catch { case _: IOException => EmptyStamp }
   }
 
-  val forHash = (toStamp: File) => tryStamp(Hash.ofFile(toStamp))
-  def forLastModified = {
+  val forHash: File => XStamp = (toStamp: File) => tryStamp(Hash.ofFile(toStamp))
+  def forLastModified: File => XStamp = {
     val reader = STJ.createCachedStampReader()
     toStamp: File =>
       tryStamp(new LastModified(reader(toStamp)))
