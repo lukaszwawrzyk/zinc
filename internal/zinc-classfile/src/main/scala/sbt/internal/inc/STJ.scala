@@ -126,9 +126,8 @@ sealed trait PathFunctions {
   }
 
   def fromUrl(url: URL): JaredClass = {
-    val Array(jarUri, cls) = url.toString.split("!/")
-    val fileUri = URI.create(jarUri.stripPrefix("jar:"))
-    val jar = uriToFile(fileUri)
+    val Array(fileUri, cls) = url.getPath.split("!/")
+    val jar = uriToFile(URI.create(fileUri))
     init(jar, cls)
   }
 
