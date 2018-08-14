@@ -122,28 +122,19 @@ sealed trait PathFunctions {
   type JaredClass = String
   type RelClass = String
 
-  lazy val isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
-
   def init(jar: File, cls: RelClass): JaredClass = {
-    // to ensure consistent 'slashing' as those identifies are used e.g. in maps
-    val classPath = if (isWindows) cls.replace("/", "\\") else cls
-    s"$jar!$classPath"
+    val relClass = if (File.separatorChar == '/') cls else cls.replace(File.separatorChar, '/')
+    s"$jar!$relClass"
   }
 
-  // from url like returned from class loader
   def fromUrl(url: URL): JaredClass = {
-    val Array(jarUri, cls) = url.toString.split("!")
-    fromJarUriAndRelClass(URI.create(jarUri), cls)
+    val Array(jarUri, cls) = url.toString.split("!/")
+    val fileUri = URI.create(jarUri.stripPrefix("jar:"))
+    val jar = uriToFile(fileUri)
+    init(jar, cls)
   }
 
-  private def fromJarUriAndRelClass(jarUri: URI, cls: RelClass): JaredClass = {
-    val jar = jarUriToFile(jarUri)
-    // TODO this is needed, but hopefully shouldn't be - to investigate
-    val relClass = cls.stripPrefix("/").stripPrefix("\\")
-    init(jar, relClass)
-  }
-
-  // From sbt.io.IO, correctly handles uri like: file:<a windows path>
+  // From sbt.io.IO, correctly handles URI like: "file:<any windows path>"
   private def uriToFile(uri: URI): File = {
     val part = uri.getSchemeSpecificPart
     // scheme might be omitted for relative URI reference.
@@ -182,11 +173,6 @@ sealed trait PathFunctions {
   def jaredClassToJarFile(jc: JaredClass): File = {
     val Array(jar, _) = jc.split("!")
     new File(jar)
-  }
-
-  protected def jarUriToFile(jarUri: URI): File = {
-    val fileUri = URI.create(jarUri.toString.stripPrefix("jar:"))
-    uriToFile(fileUri)
   }
 
   protected def fileToJarUri(jarFile: File): URI = {

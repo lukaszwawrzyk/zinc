@@ -107,8 +107,8 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       // This identifier will be stored as a java.io.File. Its constructor will normalize slashes
       // which means that the identifier to be consistent should at all points have consistent
       // slashes for safe comparisons, especially in sets or maps.
-      val fixedCls = if (isWindows) cls.replace("/", "\\") else cls
-      s"$jar!$fixedCls"
+      val relClass = if (File.separatorChar == '/') cls else cls.replace(File.separatorChar, '/')
+      s"$jar!$relClass"
     }
 
     def init(cls: RelClass): JaredClass = {
