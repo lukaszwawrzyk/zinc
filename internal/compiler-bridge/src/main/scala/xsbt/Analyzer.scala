@@ -104,9 +104,11 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
     def isWindows: Boolean = System.getProperty("os.name").toLowerCase.contains("win")
 
     def init(jar: File, cls: RelClass): JaredClass = {
-      // to ensure consistent 'slashing' as those identifies are used e.g. in maps
-      val classPath = if (isWindows) cls.replace("/", "\\") else cls
-      s"$jar!$classPath"
+      // This identifier will be stored as a java.io.File. Its constructor will normalize slashes
+      // which means that the identifier to be consistent should at all points have consistent
+      // slashes for safe comparisons, especially in sets or maps.
+      val fixedCls = if (isWindows) cls.replace("/", "\\") else cls
+      s"$jar!$fixedCls"
     }
 
     def init(cls: RelClass): JaredClass = {
