@@ -159,12 +159,6 @@ sealed trait PathFunctions {
     }
   }
 
-  def toJarUriAndRelClass(jc: JaredClass): (URI, RelClass) = {
-    val Array(jar, cls) = jc.split("!")
-    val uri = fileToJarUri(new File(jar))
-    (uri, cls)
-  }
-
   def toRelClass(jc: JaredClass): RelClass = {
     val Array(_, cls) = jc.split("!")
     cls
