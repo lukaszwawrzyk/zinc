@@ -115,8 +115,8 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
 
     def listFiles(jar: File): Set[RelClass] = {
       import scala.collection.JavaConverters._
-      // ZipFile is slightly slower than IndexBasedZipFsOps but still almost twice as fast
-      // as plain ZipFileSystem. It is quite difficult to use java code in compiler bridge.
+      // ZipFile is slightly slower than IndexBasedZipFsOps but it is quite difficult to use reuse
+      // IndexBasedZipFsOps in compiler bridge.
       val zip = new ZipFile(jar)
       val paths = zip.entries().asScala.filterNot(_.isDirectory).map(_.getName).toSet
       zip.close()

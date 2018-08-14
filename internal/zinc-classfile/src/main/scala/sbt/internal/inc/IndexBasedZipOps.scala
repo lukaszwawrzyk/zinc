@@ -32,6 +32,7 @@ trait IndexBasedZipOps extends CreateZip {
     }
   }
 
+  // TODO adjust STJ (PathFunctions) so that it is not needed
   def removeEntries(jarFile: File, classes: Iterable[String]): Unit = {
     val cleanPaths = classes.map(_.replace("\\", "/").stripPrefix("/"))
     removeEntries(jarFile.toPath, cleanPaths.toSet)
@@ -71,16 +72,14 @@ trait IndexBasedZipOps extends CreateZip {
 
   private def removeEntries(path: Path, toRemove: Set[String]): Unit = {
     val metadata = readMetadata(path)
-    removeEntriesFromMetadata(metadata, toRemove)
+    removeEntriesFromCentralDir(metadata, toRemove)
     val writeOffset = truncateMetadata(metadata, path)
     finalizeZip(metadata, path, writeOffset)
   }
 
-  private def removeEntriesFromMetadata(metadata: Metadata, toRemove: Set[String]): Unit = {
+  private def removeEntriesFromCentralDir(metadata: Metadata, toRemove: Set[String]): Unit = {
     val headers = getHeaders(metadata)
-    val sanitizedToRemove = toRemove.map(_.stripPrefix("/"))
-    val clearedHeaders =
-      headers.filterNot(header => sanitizedToRemove.contains(getFileName(header)))
+    val clearedHeaders = headers.filterNot(header => toRemove.contains(getFileName(header)))
     setHeaders(metadata, clearedHeaders)
   }
 
@@ -197,13 +196,14 @@ trait IndexBasedZipOps extends CreateZip {
 trait CreateZip {
 
   def createZip(target: File, files: Seq[(File, String)]): Unit = {
+    IO.createDirectory(target.getParentFile)
     withZipOutput(target) { output =>
       writeZip(files, output)
     }
   }
 
   private def withZipOutput(file: File)(f: ZipOutputStream => Unit): Unit = {
-    Using.fileOutputStream(false)(file) { fileOut =>
+    Using.fileOutputStream()(file) { fileOut =>
       val zipOut = new ZipOutputStream(fileOut)
       zipOut.setMethod(ZipOutputStream.DEFLATED)
       zipOut.setLevel(Deflater.NO_COMPRESSION)
