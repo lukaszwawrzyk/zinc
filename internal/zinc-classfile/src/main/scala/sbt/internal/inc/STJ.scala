@@ -17,11 +17,11 @@ import xsbti.compile.{ Output, SingleOutput }
 
 object STJ extends PathFunctions with Debugging {
 
-  def stashIndex(jar: File): IndexBasedZipFsOps.Metadata = {
+  def stashIndex(jar: File): IndexBasedZipFsOps.CentralDir = {
     IndexBasedZipFsOps.readCentralDir(jar)
   }
 
-  def unstashIndex(jar: File, index: IndexBasedZipFsOps.Metadata): Unit = {
+  def unstashIndex(jar: File, index: IndexBasedZipFsOps.CentralDir): Unit = {
     IndexBasedZipFsOps.writeCentralDir(jar, index)
   }
 

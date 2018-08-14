@@ -2,31 +2,32 @@ package sbt.internal.inc
 
 import java.io.OutputStream
 import java.nio.file.Path
-import sbt.internal.inc.zip.ZipMetadata
+
+import sbt.internal.inc.zip.ZipCentralDir
 
 import scala.collection.JavaConverters._
 
 object IndexBasedZipFsOps extends IndexBasedZipOps {
-  override type Metadata = ZipMetadata
-  override type Header = ZipMetadata.Entry
+  override type CentralDir = ZipCentralDir
+  override type Header = ZipCentralDir.Entry
 
-  protected def readMetadata(path: Path): Metadata = {
-    new ZipMetadata(path)
+  protected def readCentralDir(path: Path): CentralDir = {
+    new ZipCentralDir(path)
   }
 
-  protected def getCentralDirStart(metadata: Metadata): Long = {
-    metadata.getCentralDirStart
+  protected def getCentralDirStart(centralDir: CentralDir): Long = {
+    centralDir.getCentralDirStart
   }
 
-  protected def setCentralDirStart(metadata: Metadata, centralDirStart: Long): Unit = {
-    metadata.setCentralDirStart(centralDirStart)
+  protected def setCentralDirStart(centralDir: CentralDir, centralDirStart: Long): Unit = {
+    centralDir.setCentralDirStart(centralDirStart)
   }
 
-  protected def getHeaders(metadata: Metadata): Seq[Header] = {
-    metadata.getHeaders.asScala
+  protected def getHeaders(centralDir: CentralDir): Seq[Header] = {
+    centralDir.getHeaders.asScala
   }
-  protected def setHeaders(metadata: Metadata, headers: Seq[Header]): Unit = {
-    metadata.setHeaders(new java.util.ArrayList[Header](headers.asJava))
+  protected def setHeaders(centralDir: CentralDir, headers: Seq[Header]): Unit = {
+    centralDir.setHeaders(new java.util.ArrayList[Header](headers.asJava))
   }
 
   protected def getFileName(header: Header): String = {
@@ -45,7 +46,7 @@ object IndexBasedZipFsOps extends IndexBasedZipOps {
     header.getLastModifiedTime
   }
 
-  protected def dumpMetadata(metadata: Metadata, outputStream: OutputStream): Unit = {
-    metadata.dump(outputStream)
+  protected def writeCentralDir(centralDir: CentralDir, outputStream: OutputStream): Unit = {
+    centralDir.dump(outputStream)
   }
 }

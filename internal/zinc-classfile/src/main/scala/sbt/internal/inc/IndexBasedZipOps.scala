@@ -22,8 +22,8 @@ trait IndexBasedZipOps extends CreateZip {
 
     private def initializeCache(jar: File): Map[String, Long] = {
       if (jar.exists()) {
-        val metadata = readMetadata(jar.toPath)
-        val headers = getHeaders(metadata)
+        val centralDir = readCentralDir(jar.toPath)
+        val headers = getHeaders(centralDir)
         headers.map(header => getFileName(header) -> getLastModifiedTime(header))(
           collection.breakOut)
       } else {
@@ -52,62 +52,62 @@ trait IndexBasedZipOps extends CreateZip {
     }
   }
 
-  def readCentralDir(file: File): Metadata = {
-    readMetadata(file.toPath)
+  def readCentralDir(file: File): CentralDir = {
+    readCentralDir(file.toPath)
   }
 
-  def writeCentralDir(file: File, centralDir: Metadata): Unit = {
-    storeMetadata(file.toPath, centralDir)
+  def writeCentralDir(file: File, centralDir: CentralDir): Unit = {
+    writeCentralDir(file.toPath, centralDir)
   }
 
-  type Metadata
+  type CentralDir
   type Header
 
-  private def storeMetadata(path: Path, newMetadata: Metadata): Unit = {
-    val currentMetadata = readMetadata(path)
-    val currentCentralDirStart = truncateMetadata(currentMetadata, path)
-    finalizeZip(newMetadata, path, currentCentralDirStart)
+  private def writeCentralDir(path: Path, newCentralDir: CentralDir): Unit = {
+    val currentCentralDir = readCentralDir(path)
+    val currentCentralDirStart = truncateCentralDir(currentCentralDir, path)
+    finalizeZip(newCentralDir, path, currentCentralDirStart)
   }
 
   private def removeEntries(path: Path, toRemove: Set[String]): Unit = {
-    val metadata = readMetadata(path)
-    removeEntriesFromCentralDir(metadata, toRemove)
-    val writeOffset = truncateMetadata(metadata, path)
-    finalizeZip(metadata, path, writeOffset)
+    val centralDir = readCentralDir(path)
+    removeEntriesFromCentralDir(centralDir, toRemove)
+    val writeOffset = truncateCentralDir(centralDir, path)
+    finalizeZip(centralDir, path, writeOffset)
   }
 
-  private def removeEntriesFromCentralDir(metadata: Metadata, toRemove: Set[String]): Unit = {
-    val headers = getHeaders(metadata)
+  private def removeEntriesFromCentralDir(centralDir: CentralDir, toRemove: Set[String]): Unit = {
+    val headers = getHeaders(centralDir)
     val clearedHeaders = headers.filterNot(header => toRemove.contains(getFileName(header)))
-    setHeaders(metadata, clearedHeaders)
+    setHeaders(centralDir, clearedHeaders)
   }
 
   private def mergeArchives(target: Path, source: Path): Unit = {
-    val targetMetadata = readMetadata(target)
-    val sourceMetadata = readMetadata(source)
+    val targetCentralDir = readCentralDir(target)
+    val sourceCentralDir = readCentralDir(source)
 
     // "source" will start where "target" ends
-    val sourceStart = truncateMetadata(targetMetadata, target)
+    val sourceStart = truncateCentralDir(targetCentralDir, target)
     // "source" data (files) is as long as from its beginning till the start of central dir
-    val sourceLength = getCentralDirStart(sourceMetadata)
+    val sourceLength = getCentralDirStart(sourceCentralDir)
 
     transferAll(source, target, startPos = sourceStart, bytesToTransfer = sourceLength)
 
-    val mergedHeaders = mergeHeaders(targetMetadata, sourceMetadata, sourceStart)
-    setHeaders(targetMetadata, mergedHeaders)
+    val mergedHeaders = mergeHeaders(targetCentralDir, sourceCentralDir, sourceStart)
+    setHeaders(targetCentralDir, mergedHeaders)
 
     val centralDirStart = sourceStart + sourceLength
-    finalizeZip(targetMetadata, target, centralDirStart)
+    finalizeZip(targetCentralDir, target, centralDirStart)
 
     Files.delete(source)
   }
 
   private def mergeHeaders(
-      targetModel: Metadata,
-      sourceModel: Metadata,
+      targetCentralDir: CentralDir,
+      sourceCentralDir: CentralDir,
       sourceStart: Long
   ): Seq[Header] = {
-    val sourceHeaders = getHeaders(sourceModel)
+    val sourceHeaders = getHeaders(sourceCentralDir)
     sourceHeaders.foreach { header =>
       // potentially offsets should be updated for each header
       // not only in central directory but a valid zip tool
@@ -119,13 +119,14 @@ trait IndexBasedZipOps extends CreateZip {
 
     // override files from target with files from source
     val sourceNames = sourceHeaders.map(getFileName).toSet
-    val targetHeaders = getHeaders(targetModel).filterNot(h => sourceNames.contains(getFileName(h)))
+    val targetHeaders =
+      getHeaders(targetCentralDir).filterNot(h => sourceNames.contains(getFileName(h)))
 
     targetHeaders ++ sourceHeaders
   }
 
-  private def truncateMetadata(metadata: Metadata, path: Path): Long = {
-    val sizeAfterTruncate = getCentralDirStart(metadata)
+  private def truncateCentralDir(centralDir: CentralDir, path: Path): Long = {
+    val sizeAfterTruncate = getCentralDirStart(centralDir)
     new FileOutputStream(path.toFile, true).getChannel
       .truncate(sizeAfterTruncate)
       .close()
@@ -133,15 +134,15 @@ trait IndexBasedZipOps extends CreateZip {
   }
 
   private def finalizeZip(
-      metadata: Metadata,
+      centralDir: CentralDir,
       path: Path,
-      metadataStart: Long
+      centralDirStart: Long
   ): Unit = {
-    setCentralDirStart(metadata, metadataStart)
-    val fileOutputStream = new FileOutputStream(path.toFile, true)
-    fileOutputStream.getChannel.position(metadataStart)
+    setCentralDirStart(centralDir, centralDirStart)
+    val fileOutputStream = new FileOutputStream(path.toFile, /*append =*/ true)
+    fileOutputStream.getChannel.position(centralDirStart)
     val outputStream = new BufferedOutputStream(fileOutputStream)
-    dumpMetadata(metadata, outputStream)
+    writeCentralDir(centralDir, outputStream)
     outputStream.close()
   }
 
@@ -170,16 +171,16 @@ trait IndexBasedZipOps extends CreateZip {
   }
 
   private def openFileForWriting(path: Path): FileChannel = {
-    new FileOutputStream(path.toFile, true).getChannel
+    new FileOutputStream(path.toFile, /*append = */ true).getChannel
   }
 
-  protected def readMetadata(path: Path): Metadata
+  protected def readCentralDir(path: Path): CentralDir
 
-  protected def getCentralDirStart(metadata: Metadata): Long
-  protected def setCentralDirStart(metadata: Metadata, centralDirStart: Long): Unit
+  protected def getCentralDirStart(centralDir: CentralDir): Long
+  protected def setCentralDirStart(centralDir: CentralDir, centralDirStart: Long): Unit
 
-  protected def getHeaders(metadata: Metadata): Seq[Header]
-  protected def setHeaders(metadata: Metadata, headers: Seq[Header]): Unit
+  protected def getHeaders(centralDir: CentralDir): Seq[Header]
+  protected def setHeaders(centralDir: CentralDir, headers: Seq[Header]): Unit
 
   protected def getFileName(header: Header): String
 
@@ -187,7 +188,7 @@ trait IndexBasedZipOps extends CreateZip {
   protected def setFileOffset(header: Header, offset: Long): Unit
   protected def getLastModifiedTime(header: Header): Long
 
-  protected def dumpMetadata(metadata: Metadata, outputStream: OutputStream): Unit
+  protected def writeCentralDir(centralDir: CentralDir, outputStream: OutputStream): Unit
 
 }
 

@@ -62,7 +62,7 @@ import static sbt.internal.inc.zip.ZipUtils.*;
 
 // Modified implementation of com.sun.nio.zipfs.ZipFileSystem that allows to:
 // read index (central directory), modify it and write at specified offset
-public class ZipMetadata {
+public class ZipCentralDir {
 
     private final byte[] cen; // CEN & ENDHDR
     private END end;
@@ -74,7 +74,7 @@ public class ZipMetadata {
     private static final boolean isWindows =
             System.getProperty("os.name").startsWith("Windows");
 
-    public ZipMetadata(Path zfpath) throws IOException {
+    public ZipCentralDir(Path zfpath) throws IOException {
         this.ch = Files.newByteChannel(zfpath, READ);
         this.cen = initCEN();
         elist = readEntries();
@@ -471,13 +471,13 @@ public class ZipMetadata {
         }
 
         ///////////////////// CEN //////////////////////
-        static Entry readCEN(ZipMetadata zipfs, int pos)
+        static Entry readCEN(ZipCentralDir zipfs, int pos)
                 throws IOException
         {
             return new Entry().cen(zipfs, pos);
         }
 
-        private Entry cen(ZipMetadata zipfs, int pos)
+        private Entry cen(ZipCentralDir zipfs, int pos)
                 throws IOException
         {
             byte[] cen = zipfs.cen;
@@ -626,7 +626,7 @@ public class ZipMetadata {
 
         ///////////////////// LOC //////////////////////
         // read NTFS, UNIX and ZIP64 data from cen.extra
-        void readExtra(ZipMetadata zipfs) throws IOException {
+        void readExtra(ZipCentralDir zipfs) throws IOException {
             if (extra == null)
                 return;
             int elen = extra.length;
