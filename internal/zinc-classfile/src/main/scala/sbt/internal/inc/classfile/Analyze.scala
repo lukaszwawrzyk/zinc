@@ -117,7 +117,7 @@ private[sbt] object Analyze {
         def loadFromClassloader(): Option[File] = {
           for {
             url <- Option(loader.getResource(classNameToClassFile(onBinaryName)))
-            file <- urlAsFile(url, log)
+            file <- urlAsFile(url, log, finalJarOutput)
           } yield { classfilesCache(onBinaryName) = file; file }
         }
 
@@ -200,22 +200,23 @@ private[sbt] object Analyze {
     jaredClass.getOrElse(realClassFile)
   }
 
-  private[this] def urlAsFile(url: URL, log: Logger): Option[File] =
-    try urlAsFile(url)
+  private[this] def urlAsFile(url: URL, log: Logger, finalJarOutput: Option[File]): Option[File] =
+    try urlAsFile(url, finalJarOutput)
     catch {
       case e: Exception =>
         log.warn("Could not convert URL '" + url.toExternalForm + "' to File: " + e.toString)
         None
     }
 
-  // copied and edited from IO
-  private def urlAsFile(url: URL): Option[File] =
-    url.getProtocol match {
-      case IO.FileScheme => Some(IO.toFile(url))
-      case "jar" =>
-        Some(new File(STJ.fromUrl(url)))
-      case _ => None
+  private def urlAsFile(url: URL, finalJarOutput: Option[File]): Option[File] = {
+    IO.urlAsFile(url).map { file =>
+      if (finalJarOutput.contains(file)) {
+        new File(STJ.fromJarAndUrl(file, url))
+      } else {
+        file
+      }
     }
+  }
 
   private def trapAndLog(log: Logger)(execute: => Unit): Unit = {
     try { execute } catch { case e: Throwable => log.trace(e); log.error(e.toString) }

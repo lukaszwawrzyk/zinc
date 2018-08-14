@@ -125,35 +125,10 @@ sealed trait PathFunctions {
     s"$jar!$relClass"
   }
 
-  def fromUrl(url: URL): JaredClass = {
-    val Array(fileUri, cls) = url.getPath.split("!/")
-    val jar = uriToFile(URI.create(fileUri))
+  // Converts URL to JaredClass but reuses the jar file extracted at the call site to avoid recalculation.
+  def fromJarAndUrl(jar: File, url: URL): JaredClass = {
+    val Array(_, cls) = url.getPath.split("!/")
     init(jar, cls)
-  }
-
-  // From sbt.io.IO, correctly handles URI like: "file:<any windows path>"
-  private def uriToFile(uri: URI): File = {
-    val part = uri.getSchemeSpecificPart
-    // scheme might be omitted for relative URI reference.
-    assert(
-      Option(uri.getScheme) match {
-        case None | Some(FileScheme) => true
-        case _                       => false
-      },
-      s"Expected protocol to be '$FileScheme' or empty in URI $uri"
-    )
-    Option(uri.getAuthority) match {
-      case None if part startsWith "/" => new File(uri)
-      case _                           =>
-        // https://github.com/sbt/sbt/issues/564
-        // https://github.com/sbt/sbt/issues/3086
-        // http://blogs.msdn.com/b/ie/archive/2006/12/06/file-uris-in-windows.aspx
-        // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=5086147
-        // The specific problem here is that `uri` will have a defined authority component for UNC names like //foo/bar/some/path.jar
-        // but the File constructor requires URIs with an undefined authority component.
-        if (!(part startsWith "/") && (part contains ":")) new File("//" + part)
-        else new File(part)
-    }
   }
 
   def getRelClass(jc: JaredClass): RelClass = {

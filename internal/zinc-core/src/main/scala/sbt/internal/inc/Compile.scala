@@ -10,16 +10,16 @@ package internal
 package inc
 
 import sbt.internal.inc.Analysis.{ LocalProduct, NonLocalProduct }
-import xsbt.api.{ APIUtil, NameHashing, HashAPI }
+import xsbt.api.{ APIUtil, HashAPI, NameHashing }
 import xsbti.api._
 import xsbti.compile.{
-  Output,
+  ClassFileManager => XClassFileManager,
+  CompileAnalysis,
   DependencyChanges,
   IncOptions,
-  CompileAnalysis,
-  ClassFileManager => XClassFileManager
+  Output
 }
-import xsbti.{ Position, UseScope, Problem, Severity }
+import xsbti.{ Position, Problem, Severity, UseScope }
 import sbt.util.Logger
 import sbt.util.InterfaceUtil.jo2o
 import java.io.File
@@ -61,6 +61,7 @@ object IncrementalCompile {
       log: Logger,
       options: IncOptions): (Boolean, Analysis) = {
     val previous = previous0 match { case a: Analysis => a }
+    // as reading last modified date is cached it has to be ensured that for each compilation iteration a new one is used
     def current = Stamps.initial(Stamper.forLastModified, Stamper.forHash, Stamper.forLastModified)
     val internalBinaryToSourceClassName = (binaryClassName: String) =>
       previous.relations.productClassName.reverse(binaryClassName).headOption
@@ -229,20 +230,7 @@ private final class AnalysisCallback(
             //  but not in the same compiler run (as in javac v. scalac)
             classDependency(dependsOn, fromClassName, context)
           case None =>
-            val cleanClassFile =
-              if (classFile.exists()) {
-                classFile
-              } else if (STJ.isJar(classFile)) {
-                STJ.getJarFile(classFile.toString)
-              } else {
-                Try(IO.urlAsFile(new URL(classFile.toString))).toOption.flatten
-                  .getOrElse(classFile)
-              }
-            externalDependency(cleanClassFile,
-                               onBinaryClassName,
-                               fromClassName,
-                               fromSourceFile,
-                               context)
+            externalDependency(classFile, onBinaryClassName, fromClassName, fromSourceFile, context)
         }
     }
 
