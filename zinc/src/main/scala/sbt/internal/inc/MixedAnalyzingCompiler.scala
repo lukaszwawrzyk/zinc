@@ -106,34 +106,27 @@ final class MixedAnalyzingCompiler(
             case Some(outputJar) =>
               val outputDir = STJ.javacOutputTempDir(outputJar)
               IO.createDirectory(outputDir)
-              val compiler = javac { originalCp: Seq[File] =>
-                outputDir +: originalCp
-              }
-              compiler.compile(
-                javaSrcs,
-                joptions,
-                CompileOutput(outputDir),
-                Some(outputJar),
-                callback,
-                incToolOptions,
-                config.reporter,
-                log,
-                config.progress
-              )
-
+              val compiler = javac(originalCp => outputDir +: originalCp)
+              compiler.compile(javaSrcs,
+                               joptions,
+                               CompileOutput(outputDir),
+                               Some(outputJar),
+                               callback,
+                               incToolOptions,
+                               config.reporter,
+                               log,
+                               config.progress)
               putJavacOutputInJar(outputJar, outputDir)
             case None =>
-              javac(identity).compile(
-                javaSrcs,
-                joptions,
-                output,
-                finalJarOutput = None,
-                callback,
-                incToolOptions,
-                config.reporter,
-                log,
-                config.progress
-              )
+              javac(identity).compile(javaSrcs,
+                                      joptions,
+                                      output,
+                                      finalJarOutput = None,
+                                      callback,
+                                      incToolOptions,
+                                      config.reporter,
+                                      log,
+                                      config.progress)
           }
         }
       }
