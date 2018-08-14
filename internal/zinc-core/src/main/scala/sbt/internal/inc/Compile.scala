@@ -233,7 +233,7 @@ private final class AnalysisCallback(
               if (classFile.exists()) {
                 classFile
               } else if (STJ.isJar(classFile)) {
-                STJ.jaredClassToJarFile(classFile.toString)
+                STJ.getJarFile(classFile.toString)
               } else {
                 Try(IO.urlAsFile(new URL(classFile.toString))).toOption.flatten
                   .getOrElse(classFile)
