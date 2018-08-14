@@ -6,16 +6,15 @@ import sbt.io.IO
 import java.util.zip.ZipFile
 import java.io.File
 
-import scala.collection.mutable.ListBuffer
-import java.util.function.Consumer
 import java.nio.file._
 import java.util.UUID
+import scala.collection.JavaConverters._
 
 import sbt.io.IO.FileScheme
 import sbt.io.syntax.URL
 import xsbti.compile.{ Output, SingleOutput }
 
-object STJ extends PathFunctions with Debugging {
+object STJ extends PathFunctions with Debugging with ForTestCode {
 
   def stashIndex(jar: File): IndexBasedZipFsOps.CentralDir = {
     IndexBasedZipFsOps.readCentralDir(jar)
@@ -82,29 +81,23 @@ object STJ extends PathFunctions with Debugging {
       }
   }
 
-  // used only in tests
-  def listFiles(f: File): Seq[String] = {
-    if (f.exists()) {
-      withZipFs(f) { fs =>
-        val list = new ListBuffer[Path]
-        Files
-          .walk(fs.getPath("/"))
-          .forEachOrdered(new Consumer[Path] {
-            override def accept(t: Path): Unit = list += t
-          })
-        list.map(_.toString)
+}
+
+sealed trait ForTestCode { this: PathFunctions =>
+
+  def listFiles(jar: File): Seq[String] = {
+    if (jar.exists()) {
+      withZipFile(jar) { zip =>
+        zip.entries().asScala.filterNot(_.isDirectory).map(_.getName).toList
       }
-    } else Nil
+    } else Seq.empty
   }
 
   def readModifiedTimeFromJar(jc: JaredClass): Long = {
     val (jar, cls) = toJarAndRelClass(jc)
     if (jar.exists()) {
-      withZipFs(jar) { fs =>
-        val path = fs.getPath(cls)
-        if (Files.exists(path)) {
-          Files.getLastModifiedTime(path).toMillis
-        } else 0
+      withZipFile(jar) { zip =>
+        Option(zip.getEntry(cls)).map(_.getLastModifiedTime.toMillis).getOrElse(0)
       }
     } else 0
   }
@@ -112,27 +105,16 @@ object STJ extends PathFunctions with Debugging {
   def existsInJar(s: JaredClass): Boolean = {
     val (jar, cls) = toJarAndRelClass(s)
     jar.exists() && {
-      val file = new ZipFile(jar, ZipFile.OPEN_READ)
-      val entryExists = file.getEntry(cls) != null
-      file.close()
-      entryExists
+      withZipFile(jar)(zip => zip.getEntry(cls) != null)
     }
   }
 
-  private def withZipFs[A](file: File, create: Boolean = false)(action: FileSystem => A): A = {
-    withZipFs(fileToJarUri(file), create)(action)
+  private def withZipFile[A](zip: File)(f: ZipFile => A): A = {
+    val file = new ZipFile(zip)
+    val result = try f(file)
+    finally file.close()
+    result
   }
-
-  private def withZipFs[A](uri: URI, create: Boolean)(action: FileSystem => A): A = {
-    val env = new java.util.HashMap[String, String]
-    if (create) env.put("create", "true")
-    val fs = FileSystems.newFileSystem(uri, env)
-    try action(fs)
-    finally {
-      fs.close()
-    }
-  }
-
 }
 
 sealed trait PathFunctions {
