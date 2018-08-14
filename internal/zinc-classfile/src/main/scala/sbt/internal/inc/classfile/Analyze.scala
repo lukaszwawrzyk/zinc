@@ -11,7 +11,7 @@ package inc
 package classfile
 
 import scala.collection.mutable
-import mutable.{ Buffer, ArrayBuffer }
+import mutable.{ ArrayBuffer, Buffer }
 import scala.annotation.tailrec
 import java.io.File
 import java.net.URL
@@ -23,7 +23,6 @@ import sbt.util.Logger
 import xsbti.compile.{ Output, SingleOutput }
 
 private[sbt] object Analyze {
-
   def apply[T](newClasses: Seq[File],
                sources: Seq[File],
                log: Logger,
@@ -74,6 +73,9 @@ private[sbt] object Analyze {
 
       val srcClassName = loadEnclosingClass(loadedClass)
 
+      // If straight to jar is enabled, we want to convert the class file that will
+      // go to a temporary directory into a STJ.JaredClass representing the target
+      // location of this class in the output jar.
       val finalClassFile = resolveFinalClassFile(newClass, output, finalJarOutput)
       srcClassName match {
         case Some(className) =>
@@ -131,11 +133,10 @@ private[sbt] object Analyze {
               } else {
                 val cachedOrigin = classfilesCache.get(onBinaryName)
                 for (file <- cachedOrigin.orElse(loadFromClassloader())) {
-                  analysis.binaryDependency(STJ.fromJavacOutputDir(file).getOrElse(file),
-                                            onBinaryName,
-                                            fromClassName,
-                                            source,
-                                            context)
+                  // binary dependency from a ClassLoader is also a path to class in temporary directory
+                  // that in case of straight to jar compilation has to be converted to final output
+                  val binaryFile = STJ.fromJavacOutputDir(file).getOrElse(file)
+                  analysis.binaryDependency(binaryFile, onBinaryName, fromClassName, source, context)
                 }
               }
             }
@@ -185,30 +186,26 @@ private[sbt] object Analyze {
   def resolveFinalClassFile(realClassFile: File,
                             output: Output,
                             finalJarOutput: Option[File]): File = {
-    finalJarOutput
-      .map { finalJarOutput =>
-        output match {
-          case s: SingleOutput =>
-            val outputDir = s.getOutputDirectory
-            val relativeClass = IO.relativize(outputDir, realClassFile).get
-            new File(STJ.init(finalJarOutput, relativeClass))
-          case _ => realClassFile // I don't know what to do
-        }
-      }
-      .getOrElse(realClassFile)
+    val jaredClass = for {
+      outputJar <- finalJarOutput
+      outputDir <- Some(output).collect { case s: SingleOutput => s.getOutputDirectory }
+    } yield {
+      val relativeClass = IO.relativize(outputDir, realClassFile).get
+      new File(STJ.init(outputJar, relativeClass))
+    }
+    jaredClass.getOrElse(realClassFile)
   }
 
   private[this] def urlAsFile(url: URL, log: Logger): Option[File] =
-    try {
-      urlAsFile0(url)
-    } catch {
+    try urlAsFile(url)
+    catch {
       case e: Exception =>
         log.warn("Could not convert URL '" + url.toExternalForm + "' to File: " + e.toString)
         None
     }
 
   // copied and edited from IO
-  private def urlAsFile0(url: URL): Option[File] =
+  private def urlAsFile(url: URL): Option[File] =
     url.getProtocol match {
       case IO.FileScheme => Some(IO.toFile(url))
       case "jar" =>
