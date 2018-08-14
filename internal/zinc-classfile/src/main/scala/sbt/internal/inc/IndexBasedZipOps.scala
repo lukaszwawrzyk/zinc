@@ -32,10 +32,8 @@ trait IndexBasedZipOps extends CreateZip {
     }
   }
 
-  // TODO adjust STJ (PathFunctions) so that it is not needed
   def removeEntries(jarFile: File, classes: Iterable[String]): Unit = {
-    val cleanPaths = classes.map(_.replace("\\", "/").stripPrefix("/"))
-    removeEntries(jarFile.toPath, cleanPaths.toSet)
+    removeEntries(jarFile.toPath, classes.toSet)
   }
 
   def mergeArchives(into: File, from: File): Unit = {

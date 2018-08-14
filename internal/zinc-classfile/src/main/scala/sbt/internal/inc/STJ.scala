@@ -161,7 +161,8 @@ sealed trait PathFunctions {
 
   def toRelClass(jc: JaredClass): RelClass = {
     val Array(_, cls) = jc.split("!")
-    cls
+    // JaredClass stores this part with File.separatorChar. however actual paths in zips always use /
+    cls.replace('\\', '/')
   }
 
   def jaredClassToJarFile(jc: JaredClass): File = {
