@@ -48,27 +48,24 @@ object STJ extends PathFunctions with ForTestCode {
 
   def withPreviousJar[A](output: Output)(compile: /*extra classpath: */ Seq[File] => A): A = {
     getOutputJar(output)
+      .filter(_.exists())
       .map { outputJar =>
         val prevJarName = outputJar.getName.replace(".jar", "_prev.jar")
         val prevJar = outputJar.toPath.resolveSibling(prevJarName).toFile
-        if (outputJar.exists()) {
-          IO.move(outputJar, prevJar)
-        }
+        IO.move(outputJar, prevJar)
 
         val result = try {
           compile(Seq(prevJar))
         } catch {
           case e: Exception =>
-            if (prevJar.exists()) {
-              IO.move(prevJar, outputJar)
-            }
+            IO.move(prevJar, outputJar)
             throw e
         }
 
-        if (prevJar.exists() && outputJar.exists()) {
+        if (outputJar.exists()) {
           STJ.mergeJars(into = prevJar, from = outputJar)
-          IO.move(prevJar, outputJar)
         }
+        IO.move(prevJar, outputJar)
         result
       }
       .getOrElse {
