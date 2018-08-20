@@ -3,6 +3,7 @@ package sbt.internal.inc
 import sbt.io.IO
 import java.util.zip.ZipFile
 import java.io.File
+import java.util.UUID
 
 import scala.collection.JavaConverters._
 
@@ -50,8 +51,7 @@ object STJ extends PathFunctions with ForTestCode {
     getOutputJar(output)
       .filter(_.exists())
       .map { outputJar =>
-        val prevJarName = outputJar.getName.replace(".jar", "_prev.jar")
-        val prevJar = outputJar.toPath.resolveSibling(prevJarName).toFile
+        val prevJar = createPrevJarPath(outputJar)
         IO.move(outputJar, prevJar)
 
         val result = try {
@@ -73,6 +73,10 @@ object STJ extends PathFunctions with ForTestCode {
       }
   }
 
+  private def createPrevJarPath(outputJar: File): File = {
+    val tempDir = sys.props.get("zinc.compile-to-jar.tmp-dir").map(new File(_)).getOrElse(IO.temporaryDirectory)
+    tempDir.toPath.resolve(s"prev-jar-${UUID.randomUUID()}.jar").toFile
+  }
 }
 
 sealed trait ForTestCode { this: PathFunctions =>
