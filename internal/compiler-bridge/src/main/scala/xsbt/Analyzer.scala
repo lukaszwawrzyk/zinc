@@ -118,9 +118,11 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile {
       // ZipFile is slightly slower than IndexBasedZipFsOps but it is quite difficult to use reuse
       // IndexBasedZipFsOps in compiler bridge.
       val zip = new ZipFile(jar)
-      val paths = zip.entries().asScala.filterNot(_.isDirectory).map(_.getName).toSet
-      zip.close()
-      paths
+      try {
+        zip.entries().asScala.filterNot(_.isDirectory).map(_.getName).toSet
+      } finally {
+        zip.close()
+      }
     }
 
     val outputJar: Option[File] = {

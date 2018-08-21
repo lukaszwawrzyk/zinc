@@ -12,6 +12,9 @@ import xsbti.compile.{ Output, SingleOutput }
 
 object STJ extends PathFunctions with ForTestCode {
 
+  val scalacOptions = Set("-YdisableFlatCpCaching")
+  val javacOptions = Set("-XDuseOptimizedZip=false")
+
   def stashIndex(jar: File): IndexBasedZipFsOps.CentralDir = {
     IndexBasedZipFsOps.readCentralDir(jar)
   }

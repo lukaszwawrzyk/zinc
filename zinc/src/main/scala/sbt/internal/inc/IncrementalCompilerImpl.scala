@@ -248,12 +248,12 @@ class IncrementalCompilerImpl extends IncrementalCompiler {
       val extraScalacOptions = {
         val scalaVersion = scalaCompiler.scalaInstance.version
         if (compileStraightToJar && scalaVersion.startsWith("2.12")) {
-          Seq("-YdisableFlatCpCaching")
+          STJ.scalacOptions
         } else Seq.empty
       }
 
       val extraJavacOptions = if (compileStraightToJar) {
-        Seq("-XDuseOptimizedZip=false")
+        STJ.javacOptions
       } else Seq.empty
 
       val config = MixedAnalyzingCompiler.makeConfig(

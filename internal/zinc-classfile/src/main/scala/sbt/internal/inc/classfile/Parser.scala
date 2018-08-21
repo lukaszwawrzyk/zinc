@@ -32,6 +32,7 @@ private[sbt] object Parser {
   def apply(url: URL): ClassFile =
     usingUrlInputStreamWithoutCaching(url)(parse(url.toString)).right.get
 
+  // JarURLConnection with caching enabled will never close the jar
   private val usingUrlInputStreamWithoutCaching = Using.resource((u: URL) =>
     ErrorHandling.translate("Error opening " + u + ": ") {
       val urlConnection = u.openConnection()

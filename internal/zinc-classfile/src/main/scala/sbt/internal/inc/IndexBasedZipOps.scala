@@ -8,7 +8,7 @@ import java.util.zip.{ Deflater, ZipOutputStream, ZipEntry }
 
 import sbt.io.{ IO, Using }
 
-trait IndexBasedZipOps extends CreateZip {
+abstract class IndexBasedZipOps extends CreateZip {
 
   class CachedStampReader {
     private var cachedNameToTimestamp: Map[String, Long] = _
@@ -191,7 +191,7 @@ trait IndexBasedZipOps extends CreateZip {
 }
 
 // Adapted from sbt.io.IO.zip - disabled compression and simplified
-trait CreateZip {
+sealed trait CreateZip {
 
   def createZip(target: File, files: Seq[(File, String)]): Unit = {
     IO.createDirectory(target.getParentFile)
@@ -210,10 +210,12 @@ trait CreateZip {
   }
 
   private def writeZip(files: Seq[(File, String)], output: ZipOutputStream): Unit = {
+    val now = System.currentTimeMillis()
+
     def makeFileEntry(file: File, name: String): ZipEntry = {
-      val e = new ZipEntry(name)
-      e.setTime(IO.getModifiedTimeOrZero(file))
-      e
+      val entry = new ZipEntry(name)
+      entry.setTime(now)
+      entry
     }
 
     def addFileEntry(file: File, name: String): Unit = {
