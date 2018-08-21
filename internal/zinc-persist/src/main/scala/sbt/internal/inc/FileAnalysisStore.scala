@@ -45,6 +45,7 @@ object FileAnalysisStore {
 
     private final val format = new BinaryAnalysisFormat(readWriteMappers)
     private final val TmpEnding = ".tmp"
+    private final val useCompression = sys.props.get("zinc.binary-file-store.use-compression").map(_ == "true").getOrElse(true)
 
     /**
      * Get `CompileAnalysis` and `MiniSetup` instances for current `Analysis`.
@@ -81,9 +82,10 @@ object FileAnalysisStore {
 
       val outputStream = new FileOutputStream(tmpAnalysisFile)
       Using.zipOutputStream(outputStream) { outputStream =>
-        // TODO allow to disable compression with a flag
-        outputStream.setMethod(ZipOutputStream.DEFLATED)
-        outputStream.setLevel(Deflater.NO_COMPRESSION)
+        if (!useCompression) {
+          outputStream.setMethod(ZipOutputStream.DEFLATED)
+          outputStream.setLevel(Deflater.NO_COMPRESSION)
+        }
 
         val protobufWriter = CodedOutputStream.newInstance(outputStream)
         outputStream.putNextEntry(new ZipEntry(analysisFileName))
