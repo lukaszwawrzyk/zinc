@@ -61,8 +61,7 @@ object IncrementalCompile {
       log: Logger,
       options: IncOptions): (Boolean, Analysis) = {
     val previous = previous0 match { case a: Analysis => a }
-    // as reading last modified date is cached it has to be ensured that for each compilation iteration a new one is used
-    def current = Stamps.initial(Stamper.forLastModified, Stamper.forHash, Stamper.forLastModified)
+    val current = Stamps.initial(() => Stamper.forLastModified, Stamper.forHash, Stamper.forLastModified)
     val internalBinaryToSourceClassName = (binaryClassName: String) =>
       previous.relations.productClassName.reverse(binaryClassName).headOption
     val internalSourceToClassNamesMap: File => Set[String] = (f: File) =>
@@ -110,18 +109,21 @@ private object AnalysisCallback {
       internalBinaryToSourceClassName: String => Option[String],
       internalSourceToClassNamesMap: File => Set[String],
       externalAPI: (File, String) => Option[AnalyzedClass],
-      current: => ReadStamps,
+      current: ReadStamps,
       output: Output,
       options: IncOptions
   ) {
-    def build(): AnalysisCallback = new AnalysisCallback(
-      internalBinaryToSourceClassName,
-      internalSourceToClassNamesMap,
-      externalAPI,
-      current,
-      output,
-      options
-    )
+    def build(): AnalysisCallback = {
+      current.reset()
+      new AnalysisCallback(
+        internalBinaryToSourceClassName,
+        internalSourceToClassNamesMap,
+        externalAPI,
+        current,
+        output,
+        options
+      )
+    }
   }
 }
 

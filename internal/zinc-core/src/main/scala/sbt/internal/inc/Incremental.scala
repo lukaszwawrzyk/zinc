@@ -125,8 +125,7 @@ object Incremental {
                          output: Output): Analysis = {
     val classFileManager = STJ
       .getOutputJar(output)
-      .map(ClassFileManager.deleteImmediatelyFromJar)
-      .getOrElse(ClassFileManager.deleteImmediately)
+      .fold(ClassFileManager.deleteImmediately)(ClassFileManager.deleteImmediatelyFromJar)
 
     prune(invalidatedSrcs, previous, classFileManager)
   }
@@ -143,8 +142,7 @@ object Incremental {
       run: XClassFileManager => T): T = {
     val classfileManager = STJ
       .getOutputJar(output)
-      .map(ClassFileManager.transactionalForJar)
-      .getOrElse(ClassFileManager.getClassFileManager(options))
+      .fold(ClassFileManager.getClassFileManager(options))(ClassFileManager.transactionalForJar)
 
     val result = try run(classfileManager)
     catch {
