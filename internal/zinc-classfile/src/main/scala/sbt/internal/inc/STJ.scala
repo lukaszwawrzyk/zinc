@@ -77,7 +77,8 @@ object STJ extends PathFunctions with ForTestCode {
   }
 
   private def createPrevJarPath(outputJar: File): File = {
-    val tempDir = sys.props.get("zinc.compile-to-jar.tmp-dir").map(new File(_)).getOrElse(IO.temporaryDirectory)
+    val tempDir =
+      sys.props.get("zinc.compile-to-jar.tmp-dir").map(new File(_)).getOrElse(IO.temporaryDirectory)
     tempDir.toPath.resolve(s"prev-jar-${UUID.randomUUID()}.jar").toFile
   }
 }

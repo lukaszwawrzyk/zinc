@@ -61,7 +61,8 @@ object IncrementalCompile {
       log: Logger,
       options: IncOptions): (Boolean, Analysis) = {
     val previous = previous0 match { case a: Analysis => a }
-    val current = Stamps.initial(() => Stamper.forLastModified, Stamper.forHash, Stamper.forLastModified)
+    val current =
+      Stamps.initial(() => Stamper.forLastModified, Stamper.forHash, Stamper.forLastModified)
     val internalBinaryToSourceClassName = (binaryClassName: String) =>
       previous.relations.productClassName.reverse(binaryClassName).headOption
     val internalSourceToClassNamesMap: File => Set[String] = (f: File) =>

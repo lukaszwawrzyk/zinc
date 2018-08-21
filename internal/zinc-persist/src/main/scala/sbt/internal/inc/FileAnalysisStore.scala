@@ -45,7 +45,8 @@ object FileAnalysisStore {
 
     private final val format = new BinaryAnalysisFormat(readWriteMappers)
     private final val TmpEnding = ".tmp"
-    private final val useCompression = sys.props.get("zinc.binary-file-store.use-compression").map(_ == "true").getOrElse(true)
+    private final val useCompression =
+      sys.props.get("zinc.binary-file-store.use-compression").map(_ == "true").getOrElse(true)
 
     /**
      * Get `CompileAnalysis` and `MiniSetup` instances for current `Analysis`.
