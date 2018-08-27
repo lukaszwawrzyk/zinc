@@ -16,10 +16,11 @@ import sbt.internal.inc.classfile.Analyze
 import sbt.internal.inc.classpath.ClasspathUtilities
 import xsbti.compile._
 import xsbti.{ AnalysisCallback, Reporter => XReporter, Logger => XLogger }
-import sbt.io.PathFinder
+import sbt.io.{ PathFinder, IO }
 
 import sbt.util.InterfaceUtil
 import sbt.util.Logger
+import sbt.util.InterfaceUtil.toSupplier
 
 /**
  * Define a Java compiler that reports on any discovered source dependencies or
@@ -118,24 +119,18 @@ final class AnalyzingJavaCompiler private[sbt] (
       }
 
       timed(javaCompilationPhase, log) {
-        val args = JavaCompiler.commandArguments(
-          absClasspath,
-          output,
-          options,
-          scalaInstance,
-          classpathOptions
-        )
+        val args = JavaCompiler
+          .commandArguments(
+            absClasspath,
+            output,
+            options,
+            scalaInstance,
+            classpathOptions
+          )
+          .toArray
         val javaSources = sources.sortBy(_.getAbsolutePath).toArray
-        val success =
-          javac.run(javaSources, args.toArray, incToolOptions, reporter, log)
-        if (!success) {
-          /* Assume that no Scalac problems are reported for a Javac-related
-           * reporter. This relies on the incremental compiler will not run
-           * Javac compilation if Scala compilation fails, which means that
-           * the same reporter won't be used for `AnalyzingJavaCompiler`. */
-          val msg = "javac returned non-zero exit code"
-          throw new CompileFailed(args.toArray, msg, reporter.problems())
-        }
+        def run(): Boolean = javac.run(javaSources, args, incToolOptions, reporter, log)
+        runWithRetryOnUnknownFailure(() => run(), reporter, args, javaSources, log)
       }
 
       /** Read the API information from [[Class]] to analyze dependencies. */
@@ -165,6 +160,54 @@ final class AnalyzingJavaCompiler private[sbt] (
       // Report that we reached the end
       progressOpt.foreach { progress =>
         progress.advance(2, 2)
+      }
+    }
+  }
+
+  private def runWithRetryOnUnknownFailure(
+      run: () => Boolean,
+      reporter: XReporter,
+      args: Array[String],
+      sources: Array[File],
+      log: Logger
+  ): Unit = {
+    /* Assume that no Scalac problems are reported for a Javac-related
+     * reporter. This relies on the incremental compiler will not run
+     * Javac compilation if Scala compilation fails, which means that
+     * the same reporter won't be used for `AnalyzingJavaCompiler`. */
+    def unknownFailure(): Boolean = reporter.problems().isEmpty
+    def warn(msg: => String): Unit = log.warn(toSupplier(msg))
+    def warnFirstUnknownFailure(): Unit = {
+      warn("javac returned non-zero exit code but there were no problems reported. Retrying...")
+    }
+    def warnUnknownFailureAfterRetry(): Unit = {
+      def indentList(args: Seq[Any]): String = args.map("  " + _).mkString(IO.Newline)
+      warn {
+        s"""javac returned non-zero exit code but there were no problems reported (after a retry).
+           |Args:
+           |${indentList(args)}
+           |Sources:
+           |${indentList(sources)}""".stripMargin
+      }
+    }
+    def throwCompilationFailed(): Nothing = {
+      val msg = "javac returned non-zero exit code"
+      throw new CompileFailed(args, msg, reporter.problems())
+    }
+
+    val success = run()
+    if (!success) {
+      if (!unknownFailure()) {
+        throwCompilationFailed()
+      } else {
+        warnFirstUnknownFailure()
+        val retrySuccess = run()
+        if (!retrySuccess) {
+          if (unknownFailure()) {
+            warnUnknownFailureAfterRetry()
+          }
+          throwCompilationFailed()
+        }
       }
     }
   }
