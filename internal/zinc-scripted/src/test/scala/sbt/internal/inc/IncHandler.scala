@@ -225,7 +225,7 @@ case class ProjectStructure(
     scalaVersion: String
 ) extends BridgeProviderSpecification {
 
-  val useStraightToJar = true
+  val useStraightToJar = false
 
   val compiler = new IncrementalCompilerImpl
   val maxErrors = 100
