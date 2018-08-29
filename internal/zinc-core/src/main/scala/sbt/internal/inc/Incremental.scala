@@ -123,11 +123,7 @@ object Incremental {
   private[sbt] def prune(invalidatedSrcs: Set[File],
                          previous: CompileAnalysis,
                          output: Output): Analysis = {
-    val classFileManager = STJ
-      .getOutputJar(output)
-      .fold(ClassFileManager.deleteImmediately)(ClassFileManager.deleteImmediatelyFromJar)
-
-    prune(invalidatedSrcs, previous, classFileManager)
+    prune(invalidatedSrcs, previous, ClassFileManager.deleteImmediately(output))
   }
 
   private[sbt] def prune(invalidatedSrcs: Set[File],
@@ -140,10 +136,7 @@ object Incremental {
 
   private[this] def manageClassfiles[T](options: IncOptions, output: Output)(
       run: XClassFileManager => T): T = {
-    val classfileManager = STJ
-      .getOutputJar(output)
-      .fold(ClassFileManager.getClassFileManager(options))(ClassFileManager.transactionalForJar)
-
+    val classfileManager = ClassFileManager.getClassFileManager(options, output)
     val result = try run(classfileManager)
     catch {
       case e: Throwable =>

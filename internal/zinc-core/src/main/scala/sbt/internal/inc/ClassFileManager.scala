@@ -19,7 +19,8 @@ import xsbti.compile.{
   DeleteImmediatelyManagerType,
   TransactionalManagerType,
   ClassFileManagerType,
-  ClassFileManager => XClassFileManager
+  ClassFileManager => XClassFileManager,
+  Output
 }
 
 object ClassFileManager {
@@ -42,6 +43,27 @@ object ClassFileManager {
     xsbti.compile.WrappedClassFileManager.of(internal, external.toOptional)
   }
 
+  def getDefaultClassFileManager(
+      classFileManagerType: Optional[ClassFileManagerType],
+      output: Output
+  ): XClassFileManager = {
+    if (classFileManagerType.isPresent) {
+      classFileManagerType.get match {
+        case _: DeleteImmediatelyManagerType => deleteImmediately(output)
+        case m: TransactionalManagerType =>
+          transactional(output, m.backupDirectory, m.logger)
+      }
+    } else deleteImmediately(output)
+  }
+
+  def getClassFileManager(options: IncOptions, output: Output): XClassFileManager = {
+    import sbt.internal.inc.JavaInterfaceUtil.{ EnrichOptional, EnrichOption }
+    val internal = getDefaultClassFileManager(options.classfileManagerType, output)
+    val external = Option(options.externalHooks())
+      .flatMap(ext => ext.getExternalClassFileManager.toOption)
+    xsbti.compile.WrappedClassFileManager.of(internal, external.toOptional)
+  }
+
   private final class DeleteClassFileManager extends XClassFileManager {
     override def delete(classes: Array[File]): Unit =
       IO.deleteFilesEmptyDirs(classes)
@@ -59,6 +81,11 @@ object ClassFileManager {
   def deleteImmediatelyFromJar(outputJar: File): XClassFileManager =
     new DeleteClassFileManagerForJar(outputJar)
 
+  def deleteImmediately(output: Output): XClassFileManager = {
+    val outputJar = STJ.getOutputJar(output)
+    outputJar.fold(deleteImmediately)(deleteImmediatelyFromJar)
+  }
+
   /**
    * Constructs a transactional [[ClassFileManager]] implementation that restores class
    * files to the way they were before compilation if there is an error. Otherwise, it
@@ -71,6 +98,11 @@ object ClassFileManager {
 
   def transactionalForJar(outputJar: File): XClassFileManager = {
     new TransactionalClassFileManagerForJar(outputJar)
+  }
+
+  def transactional(output: Output, tempDir: File, logger: sbt.util.Logger): XClassFileManager = {
+    val outputJar = STJ.getOutputJar(output)
+    outputJar.fold(transactional(tempDir, logger))(transactionalForJar)
   }
 
   private final class TransactionalClassFileManager(tempDir0: File, logger: sbt.util.Logger)
