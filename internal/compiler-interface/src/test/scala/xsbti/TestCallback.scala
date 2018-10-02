@@ -79,8 +79,6 @@ class TestCallback extends AnalysisCallback {
 
   override def apiPhaseCompleted(): Unit = {}
 
-  override def previousJar(): Optional[File] = Optional.empty[File]
-
 }
 
 object TestCallback {

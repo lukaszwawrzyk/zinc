@@ -136,12 +136,6 @@ sealed class ZincCompiler(settings: Settings, dreporter: DelegatingReporter, out
     this.computePhaseDescriptors
   }
 
-  private final lazy val classesInJarFromPrevCompilation = {
-    val prevJarOptional = callback.previousJar()
-    val prevJar = if (prevJarOptional.isPresent) Some(prevJarOptional.get) else None
-    perRunCaches.recordCache(new JarUtils.PrevJarCache(prevJar))
-  }
-
   private final val fqnsToAssociatedFiles = perRunCaches.newMap[String, (AbstractFile, Boolean)]()
 
   /** Returns the associated file of a fully qualified name and whether it's on the classpath. */
@@ -150,7 +144,9 @@ sealed class ZincCompiler(settings: Settings, dreporter: DelegatingReporter, out
       val relPathToClass = name.replace('.', '/') + ".class"
       if (JarUtils.isCompilingToJar) {
         val classInJar = JarUtils.ClassInJar(relPathToClass)
-        if (classesInJarFromPrevCompilation.contains(classInJar)) {
+        val lookingForAssoc = callback.classesInJar()
+        println(s"@@@@@@@@@@@@@ lookingForAssoc $lookingForAssoc")
+        if (lookingForAssoc.contains(name)) {
           Some(new PlainFile(classInJar))
         } else None
       } else {

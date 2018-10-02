@@ -393,7 +393,7 @@ lazy val compilerInterface212 = (project in internalPath / "compiler-interface")
         exclude[ReversedMissingMethodProblem]("xsbti.compile.ScalaInstance.loaderLibraryOnly"),
         exclude[DirectMissingMethodProblem]("xsbti.api.AnalyzedClass.of"),
         exclude[DirectMissingMethodProblem]("xsbti.api.AnalyzedClass.create"),
-        exclude[ReversedMissingMethodProblem]("xsbti.AnalysisCallback.previousJar")
+        exclude[ReversedMissingMethodProblem]("xsbti.AnalysisCallback.classesInJar")
       )
     },
   )
@@ -836,7 +836,7 @@ lazy val otherRootSettings = Seq(
   Scripted.scriptedPrescripted := { (_: File) => () },
   Scripted.scriptedUnpublished := scriptedUnpublishedTask.evaluated,
   Scripted.scriptedSource := (sourceDirectory in zinc).value / "sbt-test",
-  Scripted.scriptedCompileToJar := false,
+  Scripted.scriptedCompileToJar := true,
   publishAll := {
     val _ = (publishLocal).all(ScopeFilter(inAnyProject)).value
   }
