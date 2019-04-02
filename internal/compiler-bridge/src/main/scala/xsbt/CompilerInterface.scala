@@ -13,6 +13,7 @@ import scala.tools.nsc.Settings
 import scala.collection.mutable
 import Log.debug
 import java.io.File
+import java.io.Closeable
 
 final class CompilerInterface {
   def newCompiler(options: Array[String],
@@ -111,6 +112,10 @@ private final class CachedCompiler0(args: Array[String], output: Output, initial
     debug(log, infoOnCachedCompiler(hashCode().toLong.toHexString))
     val dreporter = DelegatingReporter(settings, delegate)
     try { run(sources.toList, changes, callback, log, dreporter, progress) } finally {
+      compiler match {
+        case closeable: Closeable => closeable.close()
+        case _                    => ()
+      }
       dreporter.dropDelegate()
     }
   }
